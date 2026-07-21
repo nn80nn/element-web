@@ -3912,6 +3912,7 @@
         "on_hold": "%(name)s on hold",
         "output_devices": "Output devices",
         "screenshare_monitor": "Share entire screen",
+        "screenshare_share_audio": "Also share system audio",
         "screenshare_title": "Share content",
         "screenshare_window": "Application window",
         "show_sidebar_button": "Show sidebar",

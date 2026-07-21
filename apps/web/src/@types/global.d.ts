@@ -125,6 +125,7 @@ declare global {
             protocol: string;
             sessionId: string;
             supportsBadgeOverlay: boolean;
+            supportsScreenShareWithAudio: boolean;
             config: IConfigOptions;
             supportedSettings: Record<string, boolean>;
         }>;

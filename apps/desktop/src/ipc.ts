@@ -6,6 +6,7 @@ Please see LICENSE files in the repository root for full details.
 */
 
 import { app, autoUpdater, desktopCapturer, ipcMain, powerSaveBlocker, TouchBar, nativeImage } from "electron";
+import type { Streams } from "electron";
 
 import IpcMainEvent = Electron.IpcMainEvent;
 import { randomArray } from "./utils.js";
@@ -143,11 +144,16 @@ ipcMain.on("ipcCall", async function (_ev: IpcMainEvent, payload) {
                 thumbnailURL: source.thumbnail.toDataURL(),
             }));
             break;
-        case "callDisplayMediaCallback":
-            getDisplayMediaCallback()?.({ video: args[0] });
+        case "callDisplayMediaCallback": {
+            const streams: Streams = { video: args[0] };
+            if (args[1]) {
+                streams.audio = "loopback";
+            }
+            getDisplayMediaCallback()?.(streams);
             setDisplayMediaCallback(null);
             ret = null;
             break;
+        }
 
         case "clearStorage":
             await clearDataAndRelaunch(global.mainWindow.webContents.session);

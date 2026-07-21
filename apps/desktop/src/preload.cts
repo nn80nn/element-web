@@ -61,6 +61,10 @@ contextBridge.exposeInMainWorld("electron", {
          * Do we need to render badge overlays for new notifications?
          */
         supportsBadgeOverlay: boolean;
+        /**
+         * Can the desktop capturer picker offer to also share system audio?
+         */
+        supportsScreenShareWithAudio: boolean;
     }> {
         ipcRenderer.emit("initialise");
         const [{ protocol, sessionId }, config, supportedSettings] = await Promise.all([
@@ -68,7 +72,15 @@ contextBridge.exposeInMainWorld("electron", {
             ipcRenderer.invoke("getConfig"),
             ipcRenderer.invoke("getSupportedSettings"),
         ]);
-        return { protocol, sessionId, config, supportedSettings, supportsBadgeOverlay: process.platform === "win32" };
+        return {
+            protocol,
+            sessionId,
+            config,
+            supportedSettings,
+            supportsBadgeOverlay: process.platform === "win32",
+            // Electron's `loopback` audio capture for getDisplayMedia is only implemented on Windows.
+            supportsScreenShareWithAudio: process.platform === "win32",
+        };
     },
 
     async setSettingValue(settingName: string, value: any): Promise<void> {

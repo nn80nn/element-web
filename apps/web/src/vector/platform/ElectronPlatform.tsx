@@ -97,6 +97,7 @@ export default class ElectronPlatform extends BasePlatform {
     private badgeOverlayRenderer?: BadgeOverlayRenderer;
     private config!: IConfigOptions;
     private supportedSettings?: Record<string, boolean>;
+    private supportsScreenShareWithAudio = false;
     private clientStartedPromiseWithResolvers = Promise.withResolvers<void>();
 
     public constructor() {
@@ -179,10 +180,16 @@ export default class ElectronPlatform extends BasePlatform {
         });
 
         this.electron.on("openDesktopCapturerSourcePicker", async () => {
-            const { finished } = Modal.createDialog(DesktopCapturerSourcePicker);
-            const [source] = await finished;
+            const { finished } = Modal.createDialog(DesktopCapturerSourcePicker, {
+                supportsAudio: this.supportsScreenShareWithAudio,
+            });
+            const [source, withAudio] = await finished;
             // getDisplayMedia promise does not return if no dummy is passed here as source
-            await this.ipc.call("callDisplayMediaCallback", source ?? { id: "", name: "", thumbnailURL: "" });
+            await this.ipc.call(
+                "callDisplayMediaCallback",
+                source ?? { id: "", name: "", thumbnailURL: "" },
+                withAudio ?? false,
+            );
         });
 
         this.electron.on("showToast", async (ev, { title, description, priority = 40 }) => {
@@ -224,12 +231,13 @@ export default class ElectronPlatform extends BasePlatform {
     }
 
     private async initialise(): Promise<void> {
-        const { protocol, sessionId, config, supportedSettings, supportsBadgeOverlay } =
+        const { protocol, sessionId, config, supportedSettings, supportsBadgeOverlay, supportsScreenShareWithAudio } =
             await this.electron.initialise();
         this.protocol = protocol;
         this.sessionId = sessionId;
         this.config = config;
         this.supportedSettings = supportedSettings;
+        this.supportsScreenShareWithAudio = supportsScreenShareWithAudio;
         if (supportsBadgeOverlay) {
             this.badgeOverlayRenderer = new BadgeOverlayRenderer();
         }

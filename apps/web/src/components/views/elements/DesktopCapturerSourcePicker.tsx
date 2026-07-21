@@ -13,6 +13,7 @@ import { _t, _td } from "../../../languageHandler";
 import BaseDialog from "..//dialogs/BaseDialog";
 import DialogButtons from "./DialogButtons";
 import AccessibleButton from "./AccessibleButton";
+import LabelledCheckbox from "./LabelledCheckbox";
 import TabbedView, { Tab, TabLocation } from "../../structures/TabbedView";
 import PlatformPeg from "../../../PlatformPeg";
 import { type NonEmptyArray } from "../../../@types/common";
@@ -68,9 +69,12 @@ export interface PickerIState {
     selectedTab: Tabs;
     sources: Array<DesktopCapturerSource>;
     selectedSource?: DesktopCapturerSource;
+    shareAudio: boolean;
 }
 export interface PickerIProps {
-    onFinished(source?: DesktopCapturerSource): void;
+    // Whether the platform is able to capture system audio alongside the video track
+    supportsAudio?: boolean;
+    onFinished(source?: DesktopCapturerSource, withAudio?: boolean): void;
 }
 
 export default class DesktopCapturerSourcePicker extends React.Component<PickerIProps, PickerIState> {
@@ -82,6 +86,7 @@ export default class DesktopCapturerSourcePicker extends React.Component<PickerI
         this.state = {
             selectedTab: Tabs.Screens,
             sources: [],
+            shareAudio: false,
         };
     }
 
@@ -110,7 +115,11 @@ export default class DesktopCapturerSourcePicker extends React.Component<PickerI
     };
 
     private onShare = (): void => {
-        this.props.onFinished(this.state.selectedSource);
+        this.props.onFinished(this.state.selectedSource, this.state.shareAudio);
+    };
+
+    private onShareAudioChange = (shareAudio: boolean): void => {
+        this.setState({ shareAudio });
     };
 
     private onTabChange = (tab: Tabs): void => {
@@ -156,6 +165,13 @@ export default class DesktopCapturerSourcePicker extends React.Component<PickerI
                     activeTabId={this.state.selectedTab}
                     onChange={this.onTabChange}
                 />
+                {this.props.supportsAudio && (
+                    <LabelledCheckbox
+                        value={this.state.shareAudio}
+                        label={_t("voip|screenshare_share_audio")}
+                        onChange={this.onShareAudioChange}
+                    />
+                )}
                 <DialogButtons
                     primaryButton={_t("action|share")}
                     hasCancel={true}
