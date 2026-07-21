@@ -8,7 +8,8 @@ Please see LICENSE files in the repository root for full details.
 
 import { logger } from "matrix-js-sdk/src/logger";
 import { type MatrixRTCSession, MatrixRTCSessionManagerEvents, type Transport } from "matrix-js-sdk/src/matrixrtc";
-import { MatrixError, type EmptyObject, type Room } from "matrix-js-sdk/src/matrix";
+import { ClientEvent, MatrixError, SyncState, type EmptyObject, type Room } from "matrix-js-sdk/src/matrix";
+import { sleep } from "matrix-js-sdk/src/utils";
 
 import defaultDispatcher from "../dispatcher/dispatcher";
 import { UPDATE_EVENT } from "./AsyncStore";
@@ -42,6 +43,10 @@ export class CallStore extends AsyncStoreWithClient<EmptyObject> {
     }
 
     private readonly configuredMatrixRTCTransports = new Set<Transport>();
+    // Delays between retries of the transports endpoint when it fails for a reason other than
+    // the homeserver simply not implementing it (eg. a timeout or network blip during a mass
+    // reconnect). Empty list = give up after the first attempt.
+    private static readonly TRANSPORT_FETCH_RETRY_DELAYS_MS = [1000, 3000, 9000];
 
     private constructor() {
         super(defaultDispatcher);
@@ -54,23 +59,39 @@ export class CallStore extends AsyncStoreWithClient<EmptyObject> {
 
     /**
      * Fetch transports used by MatrixRTC services, such as Element Call.
-     * This function is called once during Store startup which means we don't refetch
-     * transports every time we need to check for Element Call support.
+     * This is called once during Store startup, and again (only if we still don't have any
+     * transports) whenever the client recovers from a connectivity blip, so a transient
+     * failure of this request doesn't permanently disable Element Call for the session.
      */
     protected async fetchTransports(): Promise<void> {
         if (!this.matrixClient) return;
         this.configuredMatrixRTCTransports.clear();
         // Prefer checking the proper endpoint for transports.
-        try {
-            const transports = await this.matrixClient._unstable_getRTCTransports();
-            transports.forEach((t) => this.configuredMatrixRTCTransports.add(t));
-        } catch (ex) {
-            // Expected, MSC not implemented.
-            //
-            // Homeservers will return a 404 M_UNRECOGNIZED matrix error if they
-            // don't implement a requested endpoint.
-            if (ex instanceof MatrixError === false || ex.errcode !== "M_UNRECOGNIZED") {
-                logger.warn("Unexpected error when trying to fetch RTC transports", ex);
+        for (let attempt = 0; ; attempt++) {
+            try {
+                const transports = await this.matrixClient._unstable_getRTCTransports();
+                transports.forEach((t) => this.configuredMatrixRTCTransports.add(t));
+                break;
+            } catch (ex) {
+                // Expected, MSC not implemented.
+                //
+                // Homeservers will return a 404 M_UNRECOGNIZED matrix error if they
+                // don't implement a requested endpoint. This is a definitive answer, so
+                // don't retry it.
+                if (ex instanceof MatrixError && ex.errcode === "M_UNRECOGNIZED") {
+                    break;
+                }
+
+                const retryDelayMs = CallStore.TRANSPORT_FETCH_RETRY_DELAYS_MS[attempt];
+                if (retryDelayMs === undefined) {
+                    logger.warn("Unexpected error when trying to fetch RTC transports, giving up", ex);
+                    break;
+                }
+                logger.warn(
+                    `Unexpected error when trying to fetch RTC transports, retrying in ${retryDelayMs}ms`,
+                    ex,
+                );
+                await sleep(retryDelayMs);
             }
         }
         // See https://github.com/matrix-org/matrix-spec-proposals/blob/d61969a9a3696b6c54d7987b1643b5bc03670927/proposals/4143-matrix-rtc.md#discovery-of-foci-using-well-knownmatrixclient
@@ -98,6 +119,7 @@ export class CallStore extends AsyncStoreWithClient<EmptyObject> {
         }
         this.matrixClient.matrixRTC.on(MatrixRTCSessionManagerEvents.SessionStarted, this.onRTCSessionStart);
         WidgetStore.instance.on(UPDATE_EVENT, this.onWidgets);
+        this.matrixClient.on(ClientEvent.Sync, this.onSync);
 
         // If the room ID of a previously connected call is still in settings at
         // this time, that's a sign that we failed to disconnect from it
@@ -129,6 +151,7 @@ export class CallStore extends AsyncStoreWithClient<EmptyObject> {
 
         this.matrixClient?.matrixRTC.off(MatrixRTCSessionManagerEvents.SessionStarted, this.onRTCSessionStart);
         WidgetStore.instance.off(UPDATE_EVENT, this.onWidgets);
+        this.matrixClient?.off(ClientEvent.Sync, this.onSync);
     }
 
     private _connectedCalls: Set<Call> = new Set();
@@ -247,5 +270,15 @@ export class CallStore extends AsyncStoreWithClient<EmptyObject> {
 
     private onRTCSessionStart = (roomId: string, session: MatrixRTCSession): void => {
         this.updateRoom(session.room);
+    };
+
+    private onSync = (state: SyncState): void => {
+        // SyncState.Catchup fires once we're back up after a connectivity blip - if we still
+        // don't know the server's RTC transports at that point (eg. because the original fetch
+        // failed during the same blip), it's worth trying again rather than staying stuck
+        // believing Element Call is unsupported for the rest of the session.
+        if (state === SyncState.Catchup && this.configuredMatrixRTCTransports.size === 0) {
+            void this.fetchTransports();
+        }
     };
 }
