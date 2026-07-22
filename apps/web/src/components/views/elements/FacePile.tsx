@@ -42,6 +42,7 @@ const FacePile: FC<IProps> = ({
     children,
     viewUserOnClick = true,
     onClick,
+    className,
     ...props
 }) => {
     const faces = members.map(
@@ -62,7 +63,7 @@ const FacePile: FC<IProps> = ({
     );
 
     const toggled = useToggled(RightPanelPhases.MemberList);
-    const classes = classNames({
+    const classes = classNames(className, {
         mx_FacePile: true,
         mx_FacePile_toggled: toggled,
     });

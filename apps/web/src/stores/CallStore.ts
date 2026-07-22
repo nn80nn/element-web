@@ -280,5 +280,18 @@ export class CallStore extends AsyncStoreWithClient<EmptyObject> {
         if (state === SyncState.Catchup && this.configuredMatrixRTCTransports.size === 0) {
             void this.fetchTransports();
         }
+
+        // Our initial room scan in onReady() can race the MatrixRTC session manager's own
+        // room state processing (eg. state event decryption isn't necessarily done yet), so
+        // an already-ongoing call can be missed on that very first pass and never picked up
+        // again, since updateRoom() only ever (re-)checks a room once nothing is already known
+        // for it. Re-scanning on every sync is cheap (updateRoom no-ops for rooms we've already
+        // accounted for) and makes us self-heal from that race instead of staying stuck for the
+        // rest of the session.
+        if (state === SyncState.Syncing && this.matrixClient) {
+            for (const room of this.matrixClient.getRooms()) {
+                this.updateRoom(room);
+            }
+        }
     };
 }

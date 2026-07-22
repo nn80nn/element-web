@@ -104,6 +104,20 @@ Please see LICENSE files in the repository root for full details.
     flex-shrink: 0;
 }
 
+/* Discord-style row of avatars for people already in an ongoing call,
+shown before you join it. Plain (no pill background/hover), since it's
+informational rather than a toggle like the member-list face pile. */
+.mx_RoomHeader .mx_RoomHeader_callFacePile {
+    background: none;
+    padding: 0;
+    cursor: default;
+
+    &:hover {
+        background: none;
+        color: $secondary-content;
+    }
+}
+
 .mx_RoomHeader_videoCallOption {
     /* Workaround for https://github.com/element-hq/compound/issues/331 */
     min-width: 240px;

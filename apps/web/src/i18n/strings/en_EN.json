@@ -2003,6 +2003,10 @@
         "forget_room": "Forget this room",
         "forget_space": "Forget this space",
         "header": {
+            "call_face_pile_tooltip": {
+                "one": "%(count)s person in the call",
+                "other": "%(count)s people in the call"
+            },
             "join_video_call": "Join video call",
             "join_voice_call": "Join voice call",
             "n_people_asking_to_join": {

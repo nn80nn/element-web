@@ -29,6 +29,7 @@ import { RightPanelPhases } from "../../../../stores/right-panel/RightPanelStore
 import { useRoomMemberCount, useRoomMembers } from "../../../../hooks/useRoomMembers.ts";
 import { _t } from "../../../../languageHandler";
 import { getPlatformCallTypeProps, useRoomCall } from "../../../../hooks/room/useRoomCall";
+import { useCall, useParticipatingMembers } from "../../../../hooks/useCall";
 import { useRoomThreadNotifications } from "../../../../hooks/room/useRoomThreadNotifications.ts";
 import { useGlobalNotificationState } from "../../../../hooks/useGlobalNotificationState.ts";
 import { useFeatureEnabled } from "../../../../hooks/useSettings.ts";
@@ -84,6 +85,8 @@ function RoomHeaderButtons({
         showVoiceCallButton,
         showVideoCallButton,
     } = useRoomCall(room);
+    const groupCall = useCall(room.roomId);
+    const callParticipants = useParticipatingMembers(groupCall);
     const threadNotifications = useRoomThreadNotifications(room);
     const globalNotificationState = useGlobalNotificationState();
 
@@ -323,7 +326,19 @@ function RoomHeaderButtons({
             {isViewingCall && <CallGuestLinkButton room={room} />}
 
             {activeCallSessionType && !isConnectedToCall && !isViewingCall ? (
-                joinCallButton
+                <>
+                    {callParticipants.length > 0 && (
+                        <FacePile
+                            className="mx_RoomHeader_callFacePile"
+                            members={callParticipants}
+                            size="24px"
+                            overflow={false}
+                            viewUserOnClick={false}
+                            tooltipLabel={_t("room|header|call_face_pile_tooltip", { count: callParticipants.length })}
+                        />
+                    )}
+                    {joinCallButton}
+                </>
             ) : (
                 <>
                     {!isVideoRoom && videoCallButton}
