@@ -213,6 +213,29 @@ const config: Omit<Writable<Configuration>, "electronFuses"> & {
         recommends: ["libsqlcipher0", "element-io-archive-keyring"],
         fpm: ["--deb-pre-depends", "libc6 (>= 2.31)"],
     },
+    // electron-builder's default dependency list for the Arch package names two packages that
+    // are no longer installable, and pacman refuses a package whose dependencies it cannot
+    // resolve at all:
+    //   error: unable to satisfy dependency 'http-parser' required by remess-desktop
+    // http-parser has been dropped from the repositories outright, and libappindicator-gtk3
+    // now lives only in the AUR, which `pacman -U` does not consult. Everything else in the
+    // default list is still there, so this is that list with those two removed.
+    pacman: {
+        depends: [
+            "c-ares",
+            "ffmpeg",
+            "gtk3",
+            "libevent",
+            "libvpx",
+            "libxslt",
+            "libxss",
+            "minizip",
+            "nss",
+            "re2",
+            "snappy",
+            "libnotify",
+        ],
+    },
     mac: {
         target: ["dmg", "zip"],
         category: "public.app-category.social-networking",
