@@ -6,5 +6,6 @@
     "protocols": ["chat.remess.desktop", "remess"],
     "icons": "remess/build",
     "linux.executableName": "remess-desktop",
-    "linux.deb.name": "remess"
+    "linux.deb.name": "remess",
+    "linux.targets": ["tar.gz", "deb", "AppImage", "pacman"]
 }

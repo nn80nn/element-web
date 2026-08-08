@@ -90,6 +90,14 @@ people; there's an MSI next to it.
 
 Pass `-SkipCall` or `-SkipWeb` to reuse the previous output of those steps while iterating.
 
+### Linux and macOS
+
+Those can't be cross-built from Windows — macOS packaging needs macOS tooling, and Linux
+packaging needs a Linux toolchain. Run the **Build Remess** workflow from the Actions tab
+instead; it builds all three platforms on GitHub's runners and attaches the results to the
+run. Linux comes out as `.deb`, `.AppImage`, `.pacman` and a plain tarball; macOS as a
+universal `.dmg` and `.zip`.
+
 > The call UI is a separate app embedded as a widget, and a plain web build will happily
 > copy the **stock** Element Call over the top of our fork — which is why the build script
 > checks for a fork-only marker and refuses to continue if it isn't there.

@@ -1,0 +1,146 @@
+# Builds the Remess desktop app for Linux, macOS and Windows.
+#
+# This deliberately does not reuse the upstream build_desktop_* workflows: those are wired
+# into Element's release pipeline (they check out element-hq/element-web by name, expect
+# Element's signing secrets, and publish to packages.element.io). This one just does what
+# apps/desktop/remess/build.ps1 does locally, once per platform.
+#
+# Run it from the Actions tab; artifacts are attached to the run.
+name: Build Remess
+
+on:
+    workflow_dispatch:
+        inputs:
+            platforms:
+                description: "Which platforms to build"
+                type: choice
+                default: "all"
+                options:
+                    - all
+                    - linux
+                    - macos
+                    - windows
+            element-call-ref:
+                description: "Branch or tag of the element-call fork to build against"
+                type: string
+                default: "livekit"
+
+permissions: {}
+
+jobs:
+    build:
+        strategy:
+            # One platform failing shouldn't throw away the others' artifacts.
+            fail-fast: false
+            matrix:
+                include:
+                    - platform: linux
+                      runs-on: ubuntu-24.04
+                      builder-args: --linux --x64
+                    - platform: macos
+                      runs-on: macos-latest
+                      # Universal so the result runs on both Apple Silicon and Intel; we ship
+                      # no native modules, so there is nothing that has to be built twice.
+                      builder-args: --mac --universal
+                    - platform: windows
+                      runs-on: windows-latest
+                      builder-args: --win --x64
+        name: ${{ matrix.platform }}
+        runs-on: ${{ matrix.runs-on }}
+        if: inputs.platforms == 'all' || inputs.platforms == matrix.platform
+        permissions:
+            contents: read
+        defaults:
+            run:
+                # Keeps a single set of shell commands working on all three runners.
+                shell: bash
+        env:
+            VARIANT_PATH: remess/release/build.json
+            # We have no code signing identity; without this electron-builder goes looking
+            # for one in the keychain and fails the macOS build rather than building unsigned.
+            CSC_IDENTITY_AUTO_DISCOVERY: false
+
+        steps:
+            - name: Check out Remess
+              uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+              with:
+                  persist-credentials: false
+
+            - name: Check out the element-call fork
+              uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+              with:
+                  repository: nn80nn/element-call
+                  ref: ${{ inputs.element-call-ref }}
+                  path: element-call
+                  persist-credentials: false
+
+            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+              with:
+                  node-version-file: apps/desktop/.node-version
+                  cache: pnpm
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            # element-call pins its own pnpm via packageManager, which is a different version
+            # from the one this repo pins, so call it explicitly rather than fighting over PATH.
+            - name: Build element-call (embedded)
+              working-directory: element-call
+              run: |
+                  npx --yes pnpm@11.6.0 install --frozen-lockfile
+                  NODE_OPTIONS=--max-old-space-size=16384 npx --yes pnpm@11.6.0 exec vite build --config vite-embedded.config.ts
+
+            - name: Build the web app
+              working-directory: apps/web
+              run: pnpm run build
+
+            - name: Overlay the element-call fork onto the bundled widget
+              run: |
+                  set -euo pipefail
+                  widget=apps/web/webapp/widgets/element-call
+                  rm -rf "$widget"
+                  cp -r element-call/dist "$widget"
+                  # A plain web build copies the stock Element Call over the top of our fork,
+                  # so check a fork-only string actually survived into the bundle.
+                  if ! grep -rq "dtln-suppressor" "$widget/assets"; then
+                      echo "Bundled widget does not look like our fork" >&2
+                      exit 1
+                  fi
+
+            - name: Stage the desktop webapp
+              run: |
+                  set -euo pipefail
+                  rm -rf apps/desktop/webapp
+                  cp -r apps/web/webapp apps/desktop/webapp
+                  cp apps/desktop/remess/release/config.json apps/desktop/webapp/config.json
+
+            - name: Pack webapp.asar
+              working-directory: apps/desktop
+              run: pnpm exec asar p webapp webapp.asar
+
+            - name: Build the desktop app
+              working-directory: apps/desktop
+              run: |
+                  set -euo pipefail
+                  pnpm exec tsc
+                  node scripts/copy-res.ts
+                  pnpm exec electron-builder ${{ matrix.builder-args }} --publish=never
+
+            - name: Collect installers
+              run: |
+                  set -euo pipefail
+                  mkdir -p out
+                  # Everything a user would actually download, ignoring build intermediates
+                  # such as the unpacked directory and the Squirrel nupkg.
+                  find apps/desktop/dist -maxdepth 2 -type f \
+                      \( -name "*.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.zip" \
+                      -o -name "*.deb" -o -name "*.AppImage" -o -name "*.pacman" -o -name "*.tar.gz" \) \
+                      -exec cp {} out/ \;
+                  ls -lh out
+
+            - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+              with:
+                  name: remess-${{ matrix.platform }}
+                  path: out/
+                  if-no-files-found: error

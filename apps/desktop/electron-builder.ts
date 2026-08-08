@@ -55,6 +55,7 @@ interface Variant extends Metadata {
     "appId": string;
     "linux.executableName"?: string;
     "linux.deb.name"?: string;
+    "linux.targets"?: string[];
     "protocols": string[];
     /**
      * Directory holding this variant's `icon.png`/`icon.ico`/`icon.icon`, relative to
@@ -101,6 +102,22 @@ function icon(name: `icon.${"png" | "ico" | "icon"}`): string {
         return `${variant.icons}/${name}`;
     }
     return `build/${name}`;
+}
+
+/**
+ * The macOS icon. Apple's `.icon` bundle can only really be authored on a Mac, so a variant
+ * that doesn't ship one falls back to its own PNG, which electron-builder converts for us.
+ * Falling back to the default variant's icon instead would ship the wrong product's brand.
+ */
+function macIcon(): string {
+    if (
+        variant.icons &&
+        !fs.existsSync(path.join(variant.icons, "icon.icon")) &&
+        fs.existsSync(path.join(variant.icons, "icon.png"))
+    ) {
+        return `${variant.icons}/icon.png`;
+    }
+    return icon("icon.icon");
 }
 
 interface Configuration extends BaseConfiguration {
@@ -161,7 +178,7 @@ const config: Omit<Writable<Configuration>, "electronFuses"> & {
         electron_protocol: variant.protocols[0],
     },
     linux: {
-        target: ["tar.gz", "deb"],
+        target: variant["linux.targets"] ?? ["tar.gz", "deb"],
         category: "Network;InstantMessaging;Chat",
         icon: icon("icon.png"),
         executableName: variant.name, // element-desktop or element-desktop-nightly
@@ -192,12 +209,12 @@ const config: Omit<Writable<Configuration>, "electronFuses"> & {
         gatekeeperAssess: true,
         strictVerify: true,
         entitlements: "./build/entitlements.mac.plist",
-        icon: icon("icon.icon"),
+        icon: macIcon(),
         mergeASARs: true,
         x64ArchFiles: "**/matrix-seshat/*.node", // hak already runs lipo
     },
     dmg: {
-        badgeIcon: icon("icon.icon"),
+        badgeIcon: macIcon(),
     },
     win: {
         target: ["squirrel", "msi"],
