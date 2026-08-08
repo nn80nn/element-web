@@ -32,6 +32,7 @@ import IdentityAuthClient from "../IdentityAuthClient";
 import { _t } from "../languageHandler";
 import { formatList } from "./FormattingUtils";
 import { persistTokens } from "./tokens/tokens.ts";
+import { createSendScheduler } from "./sendScheduler.ts";
 
 const localStorage = window.localStorage;
 
@@ -156,6 +157,9 @@ export function createClientWithCreds(creds: IMatrixClientCreds, oauth?: OAuth2)
         enableEncryptedStateEvents: SettingsStore.getValue("feature_msc4362_encrypted_state_events"),
         unstableMSC1763Retention: SettingsStore.getValue("feature_retention"),
         roomNameGenerator,
+        // Otherwise the js-sdk default-constructs a scheduler that treats any connection error
+        // as immediately fatal; see the module for why that's the wrong call for us.
+        scheduler: createSendScheduler(),
     };
 
     const newCli = createMatrixClient(opts);
