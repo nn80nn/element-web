@@ -442,6 +442,31 @@ describe("LegacyCallHandler without third party protocols", () => {
         expect(mockAudioBufferSourceNode.stop).toHaveBeenCalled();
     });
 
+    it("should stop a ring that was paused while it was still loading", async () => {
+        // Answering a call before the ringtone had finished loading used to leave it
+        // looping for good: pause() ran first and found nothing recorded to stop, then
+        // play() finished and started the sound anyway.
+        mockAudioBufferSourceNode.stop.mockClear();
+
+        const playing = callHandler.play(AudioID.Ring);
+        callHandler.pause(AudioID.Ring);
+        await playing;
+
+        expect(mockAudioBufferSourceNode.stop).toHaveBeenCalled();
+        expect(callHandler.isPlaying(AudioID.Ring)).toBe(false);
+    });
+
+    it("should keep playing a ring that was not paused", async () => {
+        // The source node mock is shared across this suite, so only calls made from here on
+        // say anything about this test.
+        mockAudioBufferSourceNode.stop.mockClear();
+
+        await callHandler.play(AudioID.Ring);
+
+        expect(callHandler.isPlaying(AudioID.Ring)).toBe(true);
+        expect(mockAudioBufferSourceNode.stop).not.toHaveBeenCalled();
+    });
+
     it("should still start a native call", async () => {
         callHandler.placeCall(NATIVE_ROOM_ALICE, CallType.Voice);
 

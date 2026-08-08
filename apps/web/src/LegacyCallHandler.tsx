@@ -113,6 +113,9 @@ export default class LegacyCallHandler extends TypedEventEmitter<LegacyCallHandl
 
     private backgroundAudio = new BackgroundAudio();
     private playingSources: Record<string, AudioBufferSourceNode> = {}; // Record them for stopping
+    // Bumped by every play() and every pause(), so that a play() which is still loading its
+    // audio when pause() arrives can tell that it has been superseded. See play() for why.
+    private playGenerations: Partial<Record<AudioID, number>> = {};
 
     public constructor(private readonly sdkContext: SDKContextClass) {
         super();
@@ -335,8 +338,23 @@ export default class LegacyCallHandler extends TypedEventEmitter<LegacyCallHandl
             [AudioID.Busy]: [`./media/busy`, false],
         };
 
+        // Loading and starting the audio is asynchronous, so the source only becomes
+        // stoppable once we get here. A pause() in the meantime would find nothing recorded
+        // and return having done nothing, and this would then start a looping sound that
+        // nothing is left holding a reference to -- which is how accepting a call quickly
+        // enough used to leave the ringtone playing for good. Note whether we have been
+        // superseded while awaiting, and if so stop the sound instead of publishing it.
+        const generation = this.nextPlayGeneration(audioId);
+
         const [urlPrefix, loop] = audioInfo[audioId];
         const source = await this.backgroundAudio.pickFormatAndPlay(urlPrefix, ["mp3", "ogg"], loop);
+
+        if (this.playGenerations[audioId] !== generation) {
+            logger.debug(`${logPrefix} superseded while loading, stopping immediately`);
+            source.stop();
+            return;
+        }
+
         if (this.playingSources[audioId]) {
             logger.warn(`${logPrefix} Already playing audio ${audioId}!`);
         }
@@ -348,6 +366,9 @@ export default class LegacyCallHandler extends TypedEventEmitter<LegacyCallHandl
         const logPrefix = `LegacyCallHandler.pause(${audioId}):`;
         logger.debug(`${logPrefix} beginning of function`);
 
+        // Cancels any play() still loading, as well as stopping one already playing.
+        this.nextPlayGeneration(audioId);
+
         const source = this.playingSources[audioId];
         if (!source) {
             logger.debug(`${logPrefix} audio not playing`);
@@ -358,6 +379,12 @@ export default class LegacyCallHandler extends TypedEventEmitter<LegacyCallHandl
         delete this.playingSources[audioId];
 
         logger.debug(`${logPrefix} paused audio`);
+    }
+
+    private nextPlayGeneration(audioId: AudioID): number {
+        const generation = (this.playGenerations[audioId] ?? 0) + 1;
+        this.playGenerations[audioId] = generation;
+        return generation;
     }
 
     /**
