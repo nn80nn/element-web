@@ -1,117 +1,109 @@
-[![Chat](https://img.shields.io/matrix/element-web:matrix.org?logo=matrix)](https://matrix.to/#/#element-web:matrix.org)
-![Tests](https://github.com/element-hq/element-web/actions/workflows/tests.yaml/badge.svg)
-![Static Analysis](https://github.com/element-hq/element-web/actions/workflows/static_analysis.yaml/badge.svg)
-[![Localazy](https://img.shields.io/endpoint?url=https%3A%2F%2Fconnect.localazy.com%2Fstatus%2Felement-web%2Fdata%3Fcontent%3Dall%26title%3Dlocalazy%26logo%3Dtrue)](https://localazy.com/p/element-web)
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=element-web&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=element-web)
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=element-web&metric=coverage)](https://sonarcloud.io/summary/new_code?id=element-web)
-[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=element-web&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=element-web)
-[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=element-web&metric=bugs)](https://sonarcloud.io/summary/new_code?id=element-web)
+<div align="center">
 
-# Element
+<img src="apps/desktop/remess/build/icon.png" alt="" width="112" height="112">
 
-Element (formerly known as Vector and Riot) is a Matrix web & desktop client built using the [Matrix
-JS SDK](https://github.com/matrix-org/matrix-js-sdk).
+# Remess
 
-# Supported Environments
+A Matrix client for people whose internet isn't very good.
 
-Element has several tiers of support for different environments:
+</div>
 
-- Supported
-    - Definition:
-        - Issues **actively triaged**, regressions **block** the release
-    - Last 2 major versions of Chrome, Firefox, and Edge on desktop OSes
-    - Last 2 versions of Safari
-    - Latest release of official Element Desktop app on desktop OSes
-    - Desktop OSes means macOS, Windows, and Linux versions for desktop devices
-      that are actively supported by the OS vendor and receive security updates
-- Best effort
-    - Definition:
-        - Issues **accepted**, regressions **do not block** the release
-        - The wider Element Products (including Element Call and the Enterprise Server Suite) do still not officially support these browsers.
-        - The element web project and its contributors should keep the client functioning and gracefully degrade where other sibling features (E.g. Element Call) may not function.
-    - Last major release of Firefox ESR and Chrome/Edge Extended Stable
-- Community Supported
-    - Definition:
-        - Issues **accepted**, regressions **do not block** the release
-        - Community contributions are welcome to support these issues
-    - Mobile web for current stable version of Chrome, Firefox, and Safari on Android, iOS, and iPadOS
-- Not supported
-    - Definition: Issues only affecting unsupported environments are **closed**
-    - Everything else
+Remess is a fork of [Element](https://github.com/element-hq/element-web) with a Discord-shaped
+interface and a lot of attention paid to what happens when the connection drops for a few
+seconds. It talks to ordinary Matrix homeservers and interoperates with ordinary Element
+users — including in calls — so using it doesn't cut you off from anyone.
 
-The period of support for these tiers should last until the releases specified above, plus 1 app release cycle(2 weeks). In the case of Firefox ESR this is extended further to allow it land in Debian Stable.
-
-For accessing Element on an Android or iOS device, we currently recommend the
-native apps [element-x-android](https://github.com/element-hq/element-x-android)
-and [element-x-ios](https://github.com/element-hq/element-x-ios).
-
-# Getting Started
-
-The easiest way to test Element is to just use the hosted copy at <https://app.element.io>.
-The `develop` branch is continuously deployed to <https://develop.element.io>
-for those who like living dangerously.
-
-To host your own instance of Element see [Installing Element Web](docs/install.md).
-
-To install Element as a desktop application, see [Running as a desktop app](#running-as-a-desktop-app) below.
+It installs **alongside** Element rather than upgrading over the top of it: its own app
+identity, its own profile directory, its own icon. If you already run Element, both work.
 
 ---
 
-# Monorepo
+## What's different from Element
 
-This repository is a monorepo hosting Element Web and other related projects in various subdirectories.
-You can read more about the structure [here](docs/monorepo.md).
+### Surviving a bad connection
 
-# Element Web
+Most of this fork's weight is here. Element assumes the network is basically fine; on a
+connection that stutters every few minutes, several of its timeouts turn ordinary lag into
+visible breakage.
 
-To learn more about Element Web [click here](apps/web/README.md)
+| | Element | Remess |
+|---|---|---|
+| Send fails because the request never left | message and everything queued behind it go red immediately | retried with backoff for ~75s |
+| File upload hits the same blip | fails, pick the file again | retried with backoff, progress bar restarts |
+| Lag during a call | dropped from the call after 10s | 30s of headroom before giving up |
+| LiveKit media connection drops | ~45s of reconnect attempts | ~3 minutes |
+| Call widget slow to answer | hangup fails at 10s, call sticks half-connected | 30s |
+| Loading authenticated media | 1s to answer, or the image doesn't load | 5s |
 
-# Running as a Desktop app
+The trade-off on the call windows is that someone who crashes or loses power keeps showing
+up in the call for up to 30 seconds instead of 18. That's the intended direction: being
+briefly wrong about who's present beats being ejected mid-sentence.
 
-Element can also be run as a desktop app, wrapped in Electron. You can download a
-pre-built version from <https://element.io/get-started> or, if you prefer,
-build it yourself.
+### Calls
 
-To build it yourself, follow the instructions at <https://github.com/element-hq/element-web/tree/develop/apps/desktop>.
+- **System audio when sharing your screen** on Windows, so what you're watching is audible
+  to everyone else — a checkbox in the screen-share picker.
+- **Local noise suppression**, on by default (RNNoise), with an experimental DTLN
+  alternative behind a second checkbox. Both run on your machine; nothing is sent anywhere.
+- **See who's already in a call before you join**, as a row of avatars in the room header.
+- Fixed a race where an already-running call was invisible until you restarted the client,
+  and another where a transient network failure permanently disabled calls for the session.
 
-Many thanks to @aviraldg for the initial work on the Electron integration.
+### Look and packaging
 
-The [configuration docs](docs/config.md#desktop-app-configuration) show how to override the desktop app's default settings if desired.
+- Discord-like purple accent throughout the call UI.
+- Its own name, icon and app identity, so it doesn't collide with an Element install.
+- No telemetry: Element's analytics key and crash-report endpoint are not carried over, and
+  bug reports are kept local for you to download and send yourself.
+- Auto-update is off. Element's update URL is deliberately absent — with it, Remess would
+  quietly update itself back into Element.
 
-# Development
+## Install
 
-Please read through the following:
+Grab an installer from [Releases](https://github.com/nn80nn/element-web/releases), or build
+one yourself (below).
 
-1. [Developer guide](./developer_guide.md)
-2. [Code style](./code_style.md)
-3. [Contribution guide](./CONTRIBUTING.md)
+The installer is not code-signed, so Windows SmartScreen will warn you: **More info →
+Run anyway**. A self-signed certificate wouldn't help — SmartScreen judges the publisher's
+reputation, not whether a signature exists.
 
-# Translations
+Remess keeps its data in `%APPDATA%\Remess`, separate from Element's. It won't inherit an
+existing Element login, so you'll sign in again.
 
-To add a new translation, head to the [translating doc](docs/translating.md).
+## Build it yourself
 
-For a developer guide, see the [translating dev doc](docs/translating-dev.md).
+You need Node 24+ and the pnpm version this repo pins, plus a checkout of the
+[element-call fork](https://github.com/nn80nn/element-call) as a sibling directory.
 
-# Triaging issues
+```bash
+pnpm install
+```
 
-Issues are triaged by community members and the Web App Team, following the [triage process](https://github.com/element-hq/element-meta/wiki/Triage-process).
+On Windows, one script does the whole thing — call app, web app, staging, installer:
 
-We use [issue labels](https://github.com/element-hq/element-meta/wiki/Issue-labelling) to sort all incoming issues.
+```bash
+powershell -ExecutionPolicy Bypass -File apps/desktop/remess/build.ps1
+```
 
-## Copyright & License
+Installers land in `apps/desktop/dist/`. `Remess Setup <version>.exe` is the one to hand to
+people; there's an MSI next to it.
 
-Copyright (c) 2014-2017 OpenMarket Ltd
-Copyright (c) 2017 Vector Creations Ltd
-Copyright (c) 2017-2025 New Vector Ltd
+Pass `-SkipCall` or `-SkipWeb` to reuse the previous output of those steps while iterating.
 
-This software is multi licensed by New Vector Ltd (Element). It can be used either:
+> The call UI is a separate app embedded as a widget, and a plain web build will happily
+> copy the **stock** Element Call over the top of our fork — which is why the build script
+> checks for a fork-only marker and refuses to continue if it isn't there.
 
-(1) for free under the terms of the GNU Affero General Public License (as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version); OR
+## Compatibility
 
-(2) for free under the terms of the GNU General Public License (as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version); OR
+Nothing here changes the Matrix protocol or the call signalling. Every change is local to
+this client: different retry behaviour, different timeouts, different branding. Remess users
+and Element users share rooms and calls normally.
 
-(3) under the terms of a paid-for Element Commercial License agreement between you and Element (the terms of which may vary depending on what you and Element have agreed to).
-Unless required by applicable law or agreed to in writing, software distributed under the Licenses is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the Licenses for the specific language governing permissions and limitations under the Licenses.
+## Relationship to upstream
 
-Please contact [licensing@element.io](mailto:licensing@element.io) to purchase
-an Element commercial license for this software.
+This tracks `element-hq/element-web` and is not affiliated with Element. Upstream's own
+README, including the browser support policy and contribution guide, is preserved at
+[README.upstream.md](README.upstream.md).
+
+Licensing is unchanged from upstream — see the LICENSE files in the repository root.
