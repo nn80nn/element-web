@@ -56,6 +56,7 @@ import { createThumbnail } from "./utils/image-media";
 import { attachMentions, attachRelation } from "./utils/messages.ts";
 import { doMaybeLocalRoomAction } from "./utils/local-room";
 import { blobIsAnimated } from "./utils/Image.ts";
+import { uploadContentWithRetry } from "./utils/uploadWithRetry.ts";
 
 // scraped out of a macOS hidpi (5660ppm) screenshot png
 //                  5669 px (x-axis)      , 5669 px (y-axis)      , per metre
@@ -365,7 +366,7 @@ export async function uploadFile(
 
         let url: string;
         try {
-            ({ content_uri: url } = await matrixClient.uploadContent(blob, {
+            ({ content_uri: url } = await uploadContentWithRetry(matrixClient, blob, {
                 progressHandler,
                 abortController,
                 includeFilename: false,
@@ -389,7 +390,10 @@ export async function uploadFile(
     } else {
         let url: string;
         try {
-            ({ content_uri: url } = await matrixClient.uploadContent(file, { progressHandler, abortController }));
+            ({ content_uri: url } = await uploadContentWithRetry(matrixClient, file, {
+                progressHandler,
+                abortController,
+            }));
         } catch (e) {
             if (abortController.signal.aborted) throw new UploadCanceledError();
             console.error("Failed to upload file", e);
