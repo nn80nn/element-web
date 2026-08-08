@@ -106,6 +106,8 @@ patchedDependencies:
     plist: patches/plist.patch
     # Workaround for type fails
     "@arcmantle/vite-plugin-import-css-sheet": patches/@arcmantle__vite-plugin-import-css-sheet.patch
+    # Workaround for the directory rename in extractArchive being blocked (EPERM) on some Windows setups
+    app-builder-lib@26.15.3: patches/app-builder-lib@26.15.3.patch
 
 peerDependencyRules:
     allowedVersions:
