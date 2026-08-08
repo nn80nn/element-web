@@ -163,6 +163,15 @@ jobs:
               working-directory: apps/desktop
               run: pnpm exec asar p webapp webapp.asar
 
+            # The pacman target shells out to bsdtar to build the package's .MTREE, and the
+            # runner image doesn't ship it. Without this the Arch package fails at the very
+            # last step with a bare "exit code 127", after everything else has built.
+            - name: Install packaging tools
+              if: runner.os == 'Linux'
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install --no-install-recommends -y libarchive-tools
+
             - name: Build the desktop app
               working-directory: apps/desktop
               run: |
