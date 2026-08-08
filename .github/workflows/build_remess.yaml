@@ -75,13 +75,8 @@ jobs:
                 shell: bash
         env:
             VARIANT_PATH: remess/release/build.json
-            # element-call depends on matrix-js-sdk from git, and preparing a git-hosted
-            # package runs a nested `pnpm install` inside the fetched tarball. That package
-            # pins an exact pnpm version, the nested call uses whichever pnpm is on PATH, and
-            # by default the mismatch is fatal. Nothing on PATH can satisfy every pinned
-            # version across three repositories, and the check doesn't affect what gets
-            # installed, so turn it into a warning.
-            npm_config_pm_on_fail: ignore
+            # Corepack must never stop to ask whether it may download a package manager.
+            COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
             # We have no code signing identity; without this electron-builder goes looking
             # for one in the keychain and fails the macOS build rather than building unsigned.
             CSC_IDENTITY_AUTO_DISCOVERY: "false"
@@ -106,26 +101,31 @@ jobs:
                   node-version-file: apps/desktop/.node-version
                   cache: pnpm
 
-            # Belt and braces, because a nested pnpm is awkward to reach: the env var is
-            # inherited by child processes by definition, and the config file is what pnpm
-            # itself reads. ~/.npmrc is deliberately not used -- pnpm keeps its global config
-            # under $XDG_CONFIG_HOME/pnpm/rc, so writing there has no effect on it.
-            # Non-fatal: `pnpm config set --global` refuses to run on setups where pnpm's
-            # global bin directory isn't on PATH, and the env var above is the load-bearing
-            # half of this anyway.
-            - name: Relax pnpm's pinned-version check
-              run: pnpm config set --global pm-on-fail ignore || true
-
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
 
-            # element-call pins its own pnpm via packageManager, which is a different version
-            # from the one this repo pins, so call it explicitly rather than fighting over PATH.
+            # Three repositories pin three different exact pnpm versions via packageManager:
+            # element-call its own, and matrix-js-sdk -- which element-call depends on from
+            # git -- another again. Preparing a git-hosted package runs a nested `pnpm
+            # install` inside the fetched tarball using whatever pnpm is on PATH, so no
+            # single version can satisfy them all and the mismatch is fatal.
+            #
+            # Corepack is the mechanism for exactly this: it resolves the pinned version per
+            # package, so both the outer and the nested install get what they asked for.
+            # Its shims go on PATH for this step only, since element-web has no
+            # packageManager field of its own and is happy with the pnpm already set up.
             - name: Build element-call (embedded)
               working-directory: element-call
               run: |
-                  npx --yes pnpm@11.6.0 install --frozen-lockfile
-                  NODE_OPTIONS=--max-old-space-size=16384 npx --yes pnpm@11.6.0 exec vite build --config vite-embedded.config.ts
+                  set -euo pipefail
+                  # $(pwd) rather than $RUNNER_TEMP: on the Windows runner the latter is a
+                  # backslash path, which does not survive being put on PATH under bash.
+                  corepack_bin="$(pwd)/.corepack"
+                  corepack enable --install-directory "$corepack_bin" pnpm
+                  export PATH="$corepack_bin:$PATH"
+                  echo "pnpm for element-call: $(pnpm --version)"
+                  pnpm install --frozen-lockfile
+                  NODE_OPTIONS=--max-old-space-size=16384 pnpm exec vite build --config vite-embedded.config.ts
 
             - name: Build the web app
               working-directory: apps/web
