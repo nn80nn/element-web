@@ -2,18 +2,23 @@ diff --git a/out/util/electronGet.js b/out/util/electronGet.js
 index a941f9d20c10ca58a84b9a600b0df468631aae01..a1d249dd5b3679df12d77cefa000c6122b67774d 100644
 --- a/out/util/electronGet.js
 +++ b/out/util/electronGet.js
-@@ -184,7 +184,13 @@ async function extractArchive(file, dir) {
+@@ -184,7 +184,18 @@ async function extractArchive(file, dir) {
              throw new Error(`Extraction of ${path.basename(file)} produced no files`);
          }
          await fs.rm(dir, { recursive: true, force: true });
 -        await fs.rename(tmpDir, dir);
-+        // Renaming a directory full of freshly-extracted .exe/.dll files is persistently
-+        // denied (EPERM) on some Windows setups, where security software blocks the rename
-+        // syscall specifically -- it is not a transient scan, retrying for 60s makes no
-+        // difference. Copying the contents across is a series of plain file writes, exactly
-+        // like the extraction that just succeeded, so it is not blocked the same way.
-+        await fs.cp(tmpDir, dir, { recursive: true });
-+        await fs.rm(tmpDir, { recursive: true, force: true });
++        try {
++            await fs.rename(tmpDir, dir);
++        }
++        catch {
++            // Renaming a directory full of freshly-extracted executables is persistently
++            // denied (EPERM) on some Windows setups, where security software blocks the
++            // rename syscall specifically -- it is not a transient scan, retrying for 60s
++            // makes no difference. Copying the contents across is a series of plain file
++            // writes, exactly like the extraction that just succeeded, so it is not blocked.
++            await fs.cp(tmpDir, dir, { recursive: true });
++            await fs.rm(tmpDir, { recursive: true, force: true });
++        }
      }
      finally {
          await release().catch(err => builder_util_1.log.warn({ err }, "failed to release lockfile"));
