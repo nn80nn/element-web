@@ -7,5 +7,7 @@
     "icons": "remess/build",
     "linux.executableName": "remess-desktop",
     "linux.deb.name": "remess",
+    "linux.maintainer": "nn80nn <nn80nn@users.noreply.github.com>",
+    "homepage": "https://github.com/nn80nn/element-web",
     "linux.targets": ["tar.gz", "deb", "AppImage", "pacman"]
 }

@@ -46,6 +46,7 @@ interface ExtraMetadata extends Metadata {
     electron_appId: string;
     electron_protocol: string;
     electron_windows_cert_sn?: string;
+    homepage?: string;
 }
 
 /**
@@ -56,6 +57,10 @@ interface Variant extends Metadata {
     "linux.executableName"?: string;
     "linux.deb.name"?: string;
     "linux.targets"?: string[];
+    /** Goes into the Linux packages as both maintainer and vendor, in `Name <email>` form. */
+    "linux.maintainer"?: string;
+    /** Replaces the homepage baked into package.json, which packages surface as their URL. */
+    "homepage"?: string;
     "protocols": string[];
     /**
      * Directory holding this variant's `icon.png`/`icon.ico`/`icon.icon`, relative to
@@ -176,12 +181,19 @@ const config: Omit<Writable<Configuration>, "electronFuses"> & {
         description: variant.description,
         electron_appId: variant.appId,
         electron_protocol: variant.protocols[0],
+        // Otherwise a variant's packages advertise element.io as their homepage.
+        ...(variant.homepage ? { homepage: variant.homepage } : {}),
     },
     linux: {
         target: variant["linux.targets"] ?? ["tar.gz", "deb"],
         category: "Network;InstantMessaging;Chat",
         icon: icon("icon.png"),
         executableName: variant.name, // element-desktop or element-desktop-nightly
+        // Both default to the author in package.json, so without this a variant's packages
+        // name Element as their maintainer.
+        ...(variant["linux.maintainer"]
+            ? { maintainer: variant["linux.maintainer"], vendor: variant["linux.maintainer"] }
+            : {}),
     },
     deb: {
         packageCategory: "net",
