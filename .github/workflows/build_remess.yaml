@@ -75,13 +75,24 @@ jobs:
                 shell: bash
         env:
             VARIANT_PATH: remess/release/build.json
-            # Corepack must never stop to ask whether it may download a package manager.
-            COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+            # element-call, and the matrix-js-sdk it pulls from git, pin different exact pnpm
+            # versions, and preparing a git-hosted package runs a nested `pnpm install`
+            # inside the fetched tarball. Left to manage this itself, pnpm fetches whichever
+            # version each package asks for. Corepack cannot do this job: running under it,
+            # pnpm refuses to switch versions at all.
+            npm_config_manage_package_manager_versions: "true"
             # We have no code signing identity; without this electron-builder goes looking
             # for one in the keychain and fails the macOS build rather than building unsigned.
             CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
         steps:
+            # Must precede any checkout. Git on the Windows runner rewrites line endings by
+            # default, and Nx's pnpm lockfile parser then fails on the multi-document
+            # pnpm-lock.yaml with "expected a single document in the stream, but found more".
+            - name: Keep line endings as committed
+              if: runner.os == 'Windows'
+              run: git config --global core.autocrlf false
+
             - name: Check out Remess
               uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
               with:
@@ -104,30 +115,16 @@ jobs:
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
 
-            # Three repositories pin three different exact pnpm versions via packageManager:
-            # element-call its own, and matrix-js-sdk -- which element-call depends on from
-            # git -- another again. Preparing a git-hosted package runs a nested `pnpm
-            # install` inside the fetched tarball using whatever pnpm is on PATH, so no
-            # single version can satisfy them all and the mismatch is fatal.
-            #
-            # Corepack is the mechanism for exactly this: it resolves the pinned version per
-            # package, so both the outer and the nested install get what they asked for.
-            # Its shims go on PATH for this step only, since element-web has no
-            # packageManager field of its own and is happy with the pnpm already set up.
+            # Invoked through npx rather than the pnpm already on PATH so that the version
+            # matches the one element-call's lockfile was written by. The nested install that
+            # prepares matrix-js-sdk is left to pnpm, which switches itself to that package's
+            # pinned version thanks to the env var set on the job.
             - name: Build element-call (embedded)
               working-directory: element-call
               run: |
                   set -euo pipefail
-                  # $(pwd) rather than $RUNNER_TEMP: on the Windows runner the latter is a
-                  # backslash path, which does not survive being put on PATH under bash.
-                  corepack_bin="$(pwd)/.corepack"
-                  # corepack resolves the directory before writing to it, so it has to exist.
-                  mkdir -p "$corepack_bin"
-                  corepack enable --install-directory "$corepack_bin" pnpm
-                  export PATH="$corepack_bin:$PATH"
-                  echo "pnpm for element-call: $(pnpm --version)"
-                  pnpm install --frozen-lockfile
-                  NODE_OPTIONS=--max-old-space-size=16384 pnpm exec vite build --config vite-embedded.config.ts
+                  npx --yes pnpm@11.6.0 install --frozen-lockfile
+                  NODE_OPTIONS=--max-old-space-size=16384 npx --yes pnpm@11.6.0 exec vite build --config vite-embedded.config.ts
 
             - name: Build the web app
               working-directory: apps/web
