@@ -1,0 +1,10 @@
+{
+    "appId": "chat.remess.desktop",
+    "name": "remess-desktop",
+    "productName": "Remess",
+    "description": "Remess: a Matrix client with Discord-style calls",
+    "protocols": ["chat.remess.desktop", "remess"],
+    "icons": "remess/build",
+    "linux.executableName": "remess-desktop",
+    "linux.deb.name": "remess"
+}

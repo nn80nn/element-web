@@ -56,6 +56,11 @@ interface Variant extends Metadata {
     "linux.executableName"?: string;
     "linux.deb.name"?: string;
     "protocols": string[];
+    /**
+     * Directory holding this variant's `icon.png`/`icon.ico`/`icon.icon`, relative to
+     * apps/desktop. Any icon the variant doesn't provide falls back to the one in `build`.
+     */
+    "icons"?: string;
 }
 
 type Writable<T> = NonNullable<
@@ -83,6 +88,19 @@ if (process.env.VARIANT_PATH) {
 
 for (const key in variant) {
     console.log(`${key}: ${variant[key as keyof Variant]}`);
+}
+
+/**
+ * Resolves an icon to the variant's own icon directory if it has one, otherwise to the
+ * default `build` directory. This lets a variant ship its own branding without having to
+ * provide every platform's icon format.
+ */
+function icon(name: `icon.${"png" | "ico" | "icon"}`): string {
+    // electron-builder wants forward slashes even on Windows.
+    if (variant.icons && fs.existsSync(path.join(variant.icons, name))) {
+        return `${variant.icons}/${name}`;
+    }
+    return `build/${name}`;
 }
 
 interface Configuration extends BaseConfiguration {
@@ -127,7 +145,14 @@ const config: Omit<Writable<Configuration>, "electronFuses"> & {
         },
         "lib/**",
     ],
-    extraResources: ["build/icon.*", "webapp.asar"],
+    // The app resolves these at runtime as `<resources>/build/icon.*`, so a variant's icons
+    // have to be remapped into `build` rather than kept under the variant directory.
+    extraResources: [
+        { from: icon("icon.png"), to: "build/icon.png" },
+        { from: icon("icon.ico"), to: "build/icon.ico" },
+        { from: icon("icon.icon"), to: "build/icon.icon" },
+        "webapp.asar",
+    ],
     extraMetadata: {
         name: variant.name,
         productName: variant.productName,
@@ -138,7 +163,7 @@ const config: Omit<Writable<Configuration>, "electronFuses"> & {
     linux: {
         target: ["tar.gz", "deb"],
         category: "Network;InstantMessaging;Chat",
-        icon: "icon.png",
+        icon: icon("icon.png"),
         executableName: variant.name, // element-desktop or element-desktop-nightly
     },
     deb: {
@@ -167,19 +192,19 @@ const config: Omit<Writable<Configuration>, "electronFuses"> & {
         gatekeeperAssess: true,
         strictVerify: true,
         entitlements: "./build/entitlements.mac.plist",
-        icon: "build/icon.icon",
+        icon: icon("icon.icon"),
         mergeASARs: true,
         x64ArchFiles: "**/matrix-seshat/*.node", // hak already runs lipo
     },
     dmg: {
-        badgeIcon: "build/icon.icon",
+        badgeIcon: icon("icon.icon"),
     },
     win: {
         target: ["squirrel", "msi"],
         signtoolOptions: {
             signingHashAlgorithms: ["sha256"],
         },
-        icon: "build/icon.ico",
+        icon: icon("icon.ico"),
     },
     msi: {
         perMachine: true,

@@ -1,0 +1,18 @@
+This directory contains the build variant for the Remess distribution of this
+fork.
+
+It deliberately uses its own appId, product name and URL schemes so that a
+Remess install lives alongside an official Element Desktop install rather than
+upgrading over the top of it: different Application User Model ID (taskbar and
+notification identity), different Squirrel/MSI package identity, different
+user data directory (`%APPDATA%/Remess` rather than `%APPDATA%/Element`) and
+different deep-link schemes. Nothing here changes the Matrix protocol or the
+call stack, so Remess and Element users remain fully interoperable.
+
+Build with:
+
+    VARIANT_PATH=remess/release/build.json pnpm exec electron-builder
+
+and copy `remess/release/config.json` into `webapp/` before packing
+`webapp.asar`, the same way `scripts/fetch-package.ts --cfgdir` does for the
+element.io variants.

@@ -87,7 +87,9 @@ export async function create(): Promise<void> {
         // Windows likes ico's too much.
         if (process.platform === "win32") {
             try {
-                const icoPath = path.join(app.getPath("temp"), "win32_element_icon.ico");
+                // Namespaced by appId: the temp directory is shared, so a fixed filename means
+                // two builds installed side by side keep overwriting each other's tray icon.
+                const icoPath = path.join(app.getPath("temp"), `win32_${buildConfig.appId}_icon.ico`);
                 await writeFile(icoPath, await pngToIco(newFavicon.toPNG()));
                 newFavicon = nativeImage.createFromPath(icoPath);
             } catch (e) {

@@ -100,19 +100,28 @@ function getUserDataPath(argv: ParsedArgs, protocolHandler: ProtocolHandler): st
     }
 
     const newUserDataPathExists = isRealUserDataDir(newUserDataPath);
-    let oldUserDataPath = path.join(app.getPath("appData"), app.getName().replace("Element", "Riot"));
-    if (argv["profile"]) {
-        oldUserDataPath += "-" + argv["profile"];
-    }
-
-    const oldUserDataPathExists = isRealUserDataDir(oldUserDataPath);
     console.log(`${newUserDataPath} exists: ${newUserDataPathExists ? "yes" : "no"}`);
-    console.log(`${oldUserDataPath} exists: ${oldUserDataPathExists ? "yes" : "no"}`);
+    if (newUserDataPathExists) return newUserDataPath;
 
-    if (!newUserDataPathExists && oldUserDataPathExists) {
-        console.log(`Using legacy user data path: ${oldUserDataPath}`);
-        return oldUserDataPath;
+    // Element was renamed from Riot, so an install that predates the rename keeps its profile
+    // under the old name. This only makes sense for Element-branded builds: for any other
+    // product name the substitution is a no-op that just resolves back to the same directory,
+    // so don't go looking for a legacy profile that cannot exist.
+    const legacyName = app.getName().replace("Element", "Riot");
+    if (legacyName !== app.getName()) {
+        let oldUserDataPath = path.join(app.getPath("appData"), legacyName);
+        if (argv["profile"]) {
+            oldUserDataPath += "-" + argv["profile"];
+        }
+
+        const oldUserDataPathExists = isRealUserDataDir(oldUserDataPath);
+        console.log(`${oldUserDataPath} exists: ${oldUserDataPathExists ? "yes" : "no"}`);
+        if (oldUserDataPathExists) {
+            console.log(`Using legacy user data path: ${oldUserDataPath}`);
+            return oldUserDataPath;
+        }
     }
+
     return newUserDataPath;
 }
 

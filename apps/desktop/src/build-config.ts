@@ -29,8 +29,12 @@ export function getBuildConfig(): BuildConfig {
     if (!buildConfig) {
         const packageJson = loadJsonFile(path.join(__dirname, "..", "package.json")) as JsonObject;
         buildConfig = {
-            appId: (packageJson["electron_appId"] as string) || "im.riot.app",
-            protocol: (packageJson["electron_protocol"] as string) || "io.element.desktop",
+            // electron-builder injects these from the build variant; the fallbacks only apply to
+            // unpackaged dev runs. They deliberately match the Remess variant rather than
+            // Element's, so that `pnpm start` doesn't claim an installed Element's taskbar
+            // identity or steal its `io.element.desktop` OIDC callbacks.
+            appId: (packageJson["electron_appId"] as string) || "chat.remess.desktop",
+            protocol: (packageJson["electron_protocol"] as string) || "chat.remess.desktop",
             windowsCertSubjectName: packageJson["electron_windows_cert_sn"] as string,
         };
     }
