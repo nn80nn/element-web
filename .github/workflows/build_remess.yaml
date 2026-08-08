@@ -75,12 +75,8 @@ jobs:
                 shell: bash
         env:
             VARIANT_PATH: remess/release/build.json
-            # element-call, and the matrix-js-sdk it pulls from git, pin different exact pnpm
-            # versions, and preparing a git-hosted package runs a nested `pnpm install`
-            # inside the fetched tarball. Left to manage this itself, pnpm fetches whichever
-            # version each package asks for. Corepack cannot do this job: running under it,
-            # pnpm refuses to switch versions at all.
-            npm_config_manage_package_manager_versions: "true"
+            # Corepack must never stop to ask whether it may download a package manager.
+            COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
             # We have no code signing identity; without this electron-builder goes looking
             # for one in the keychain and fails the macOS build rather than building unsigned.
             CSC_IDENTITY_AUTO_DISCOVERY: "false"
@@ -115,16 +111,28 @@ jobs:
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
 
-            # Invoked through npx rather than the pnpm already on PATH so that the version
-            # matches the one element-call's lockfile was written by. The nested install that
-            # prepares matrix-js-sdk is left to pnpm, which switches itself to that package's
-            # pinned version thanks to the env var set on the job.
+            # element-call and the matrix-js-sdk it pulls from git pin different exact pnpm
+            # versions, and preparing a git-hosted package runs a nested `pnpm install` in
+            # the fetched tarball using whatever pnpm is on PATH. So the version that matters
+            # for the nested install is the one on PATH, not the one we invoke.
+            #
+            # Reproduce element-call's own CI, where corepack is the only pnpm there is: it
+            # resolves the pinned version per package, so the nested install gets exactly
+            # what matrix-js-sdk asks for. That means taking pnpm/action-setup's copy off
+            # PATH for this step -- leaving it there is what made the earlier attempt fail,
+            # with the nested install picking up its 11.5.2 instead of a corepack shim.
             - name: Build element-call (embedded)
               working-directory: element-call
               run: |
                   set -euo pipefail
-                  npx --yes pnpm@11.6.0 install --frozen-lockfile
-                  NODE_OPTIONS=--max-old-space-size=16384 npx --yes pnpm@11.6.0 exec vite build --config vite-embedded.config.ts
+                  corepack_bin="$(pwd)/.corepack"
+                  mkdir -p "$corepack_bin"
+                  corepack enable --install-directory "$corepack_bin" pnpm
+                  PATH="$(printf '%s' "$PATH" | tr ':' '\n' | grep -v 'setup-pnpm' | paste -sd: -)"
+                  export PATH="$corepack_bin:$PATH"
+                  echo "pnpm on PATH: $(command -v pnpm) -> $(pnpm --version)"
+                  pnpm install --frozen-lockfile
+                  NODE_OPTIONS=--max-old-space-size=16384 pnpm exec vite build --config vite-embedded.config.ts
 
             - name: Build the web app
               working-directory: apps/web
