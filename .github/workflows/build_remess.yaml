@@ -99,6 +99,15 @@ jobs:
                   node-version-file: apps/desktop/.node-version
                   cache: pnpm
 
+            # element-call depends on matrix-js-sdk from git, and preparing a git-hosted
+            # package runs a nested `pnpm install` inside the fetched tarball. That package
+            # pins an exact pnpm version, the nested call picks up whichever pnpm is on PATH,
+            # and by default the mismatch is fatal. No single pnpm can satisfy every pinned
+            # version in the tree, and the check is advisory, so relax it. This has to go in
+            # the user config rather than on the command line to reach the nested call.
+            - name: Relax pnpm's pinned-version check
+              run: echo "pm-on-fail=ignore" >> ~/.npmrc
+
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
 
