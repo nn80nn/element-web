@@ -46,7 +46,22 @@ import DMRoomMap from "../utils/DMRoomMap.ts";
 import { type WidgetMessaging, WidgetMessagingEvent } from "../stores/widgets/WidgetMessaging.ts";
 import { BugReportEndpointURLLocal } from "../IConfigOptions.ts";
 
-const TIMEOUT_MS = 16000;
+/**
+ * How long to wait for the call widget to come up, and for it to acknowledge the actions we
+ * send it. Both of these can legitimately take a while on a slow or lossy connection, since
+ * the widget has to reach the homeserver and the SFU before it can answer us, so this is
+ * deliberately generous: a join that takes 20 seconds is a much better outcome than one that
+ * is abandoned at 16 and leaves the call stuck half-connected.
+ */
+const TIMEOUT_MS = 30000;
+
+/**
+ * The widget API transport defaults to failing requests after 10 seconds, which is shorter
+ * than the widget's own worst case for answering them. Give it the same budget as everything
+ * else here so we don't time out a hangup that was going to succeed.
+ */
+const WIDGET_TRANSPORT_TIMEOUT_SECONDS = TIMEOUT_MS / 1000;
+
 const logger = rootLogger.getChild("models/Call");
 
 // Waits until an event is emitted satisfying the given predicate
@@ -267,6 +282,7 @@ export abstract class Call extends TypedEventEmitter<CallEvent, CallEventHandler
         }
 
         logger.debug(`Widget ${this.widgetUid} now ready`);
+        messaging.widgetApi.transport.timeoutSeconds = WIDGET_TRANSPORT_TIMEOUT_SECONDS;
         return (this.widgetApi = messaging.widgetApi);
     }
 

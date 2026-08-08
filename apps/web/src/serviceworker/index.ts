@@ -157,8 +157,10 @@ async function askClientForUserIdParams(
         // We could also potentially use some version of TLS to encrypt postMessage, though that feels way more involved
         // than just reading IndexedDB ourselves.
 
-        // Avoid stalling the tab in case something goes wrong.
-        const timeoutId = setTimeout(() => reject(new Error("timeout in postMessage")), 1000);
+        // Avoid stalling the tab in case something goes wrong. This only needs to be long
+        // enough for the tab to answer a postMessage, but a busy main thread can easily blow
+        // through a second, and failing here means authenticated media doesn't load at all.
+        const timeoutId = setTimeout(() => reject(new Error("timeout in postMessage")), 5000);
 
         // We don't need particularly good randomness here - we just use this to generate a request ID, so we know
         // which postMessage reply is for our active request.
