@@ -108,29 +108,29 @@ jobs:
                   node-version-file: apps/desktop/.node-version
                   cache: pnpm
 
+            # element-call, and the matrix-js-sdk it pulls in from git, pin exact pnpm
+            # versions that differ from each other and from the one set up here. Preparing a
+            # git-hosted package runs a nested `pnpm install` inside the fetched tarball, and
+            # that nested call resolves its own pnpm -- neither the version we invoke nor
+            # PATH changes it, so the mismatch cannot be avoided, only tolerated. The check
+            # is advisory and doesn't affect what gets installed.
+            #
+            # This has to be pnpm's own global config: it ignores ~/.npmrc, and passing the
+            # setting through the environment or the command line doesn't reach the nested
+            # call. Print it back so a future failure here is unambiguous.
+            - name: Stop a pinned-pnpm mismatch being fatal
+              run: |
+                  set -euo pipefail
+                  pnpm config set --global pm-on-fail ignore
+                  echo "pm-on-fail is now: $(pnpm config get pm-on-fail)"
+
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
 
-            # element-call and the matrix-js-sdk it pulls from git pin different exact pnpm
-            # versions, and preparing a git-hosted package runs a nested `pnpm install` in
-            # the fetched tarball using whatever pnpm is on PATH. So the version that matters
-            # for the nested install is the one on PATH, not the one we invoke.
-            #
-            # Reproduce element-call's own CI, where corepack is the only pnpm there is: it
-            # resolves the pinned version per package, so the nested install gets exactly
-            # what matrix-js-sdk asks for. That means taking pnpm/action-setup's copy off
-            # PATH for this step -- leaving it there is what made the earlier attempt fail,
-            # with the nested install picking up its 11.5.2 instead of a corepack shim.
             - name: Build element-call (embedded)
               working-directory: element-call
               run: |
                   set -euo pipefail
-                  corepack_bin="$(pwd)/.corepack"
-                  mkdir -p "$corepack_bin"
-                  corepack enable --install-directory "$corepack_bin" pnpm
-                  PATH="$(printf '%s' "$PATH" | tr ':' '\n' | grep -v 'setup-pnpm' | paste -sd: -)"
-                  export PATH="$corepack_bin:$PATH"
-                  echo "pnpm on PATH: $(command -v pnpm) -> $(pnpm --version)"
                   pnpm install --frozen-lockfile
                   NODE_OPTIONS=--max-old-space-size=16384 pnpm exec vite build --config vite-embedded.config.ts
 
