@@ -111,15 +111,27 @@ jobs:
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
 
-            # Run with the version element-call pins rather than the one set up for this
-            # repo: its pnpm-workspace.yaml uses an allowBuilds key keyed by a git URL, which
-            # older pnpm rejects outright with ERR_PNPM_INVALID_VERSION_UNION. The nested
-            # install that prepares matrix-js-sdk still resolves its own pnpm, but the fork's
-            # pmOnFail setting keeps that mismatch from being fatal.
+            # Three pnpm versions are in play here and each one matters in a different place.
+            #
+            # The install itself must run element-call's pinned version: its
+            # pnpm-workspace.yaml has an allowBuilds key keyed by a git URL, which older pnpm
+            # rejects with ERR_PNPM_INVALID_VERSION_UNION.
+            #
+            # Preparing the git-hosted matrix-js-sdk then runs a nested `pnpm install` inside
+            # the fetched tarball, which insists on the version *that* package pins. The
+            # nested call locates pnpm through PNPM_HOME -- it kept picking up 11.5.2 from
+            # there even with that directory removed from PATH entirely -- so point PNPM_HOME
+            # at the version it wants. Its config comes from the tarball, so settings in
+            # either repository cannot reach it; matching the version is the way through.
             - name: Build element-call (embedded)
               working-directory: element-call
               run: |
                   set -euo pipefail
+                  nested="$(pwd)/.pnpm-nested"
+                  npm install --prefix "$nested" --no-save --no-audit --no-fund pnpm@11.2.2
+                  export PNPM_HOME="$nested/node_modules/.bin"
+                  export PATH="$PNPM_HOME:$PATH"
+                  echo "pnpm for the nested install: $(pnpm --version)"
                   npx --yes pnpm@11.6.0 install --frozen-lockfile
                   NODE_OPTIONS=--max-old-space-size=16384 npx --yes pnpm@11.6.0 exec vite build --config vite-embedded.config.ts
 
