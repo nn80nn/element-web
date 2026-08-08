@@ -28,26 +28,45 @@ on:
 permissions: {}
 
 jobs:
+    # The platform filter has to happen here rather than as an `if` on the build job: the
+    # matrix context isn't available to a job-level `if`, so it can't test what it selects.
+    # Matrix keys deliberately avoid hyphens, which GitHub's expression parser reads as
+    # subtraction rather than as part of a property name.
+    select:
+        name: Select platforms
+        runs-on: ubuntu-24.04
+        outputs:
+            include: ${{ steps.select.outputs.include }}
+        steps:
+            - name: Select platforms
+              id: select
+              env:
+                  PLATFORMS: ${{ inputs.platforms }}
+              run: |
+                  set -euo pipefail
+                  all='[
+                    {"platform": "linux",   "runner": "ubuntu-24.04",   "builderArgs": "--linux --x64"},
+                    {"platform": "macos",   "runner": "macos-latest",   "builderArgs": "--mac --universal"},
+                    {"platform": "windows", "runner": "windows-latest", "builderArgs": "--win --x64"}
+                  ]'
+                  if [ "$PLATFORMS" = "all" ]; then
+                      include=$(jq -c . <<<"$all")
+                  else
+                      include=$(jq -c --arg p "$PLATFORMS" '[.[] | select(.platform == $p)]' <<<"$all")
+                  fi
+                  echo "include=$include" >> "$GITHUB_OUTPUT"
+
     build:
+        needs: select
         strategy:
             # One platform failing shouldn't throw away the others' artifacts.
             fail-fast: false
             matrix:
-                include:
-                    - platform: linux
-                      runs-on: ubuntu-24.04
-                      builder-args: --linux --x64
-                    - platform: macos
-                      runs-on: macos-latest
-                      # Universal so the result runs on both Apple Silicon and Intel; we ship
-                      # no native modules, so there is nothing that has to be built twice.
-                      builder-args: --mac --universal
-                    - platform: windows
-                      runs-on: windows-latest
-                      builder-args: --win --x64
+                include: ${{ fromJSON(needs.select.outputs.include) }}
         name: ${{ matrix.platform }}
-        runs-on: ${{ matrix.runs-on }}
-        if: inputs.platforms == 'all' || inputs.platforms == matrix.platform
+        # macOS is built universal so the result runs on both Apple Silicon and Intel; we
+        # ship no native modules, so there is nothing that has to be built twice.
+        runs-on: ${{ matrix.runner }}
         permissions:
             contents: read
         defaults:
@@ -58,7 +77,7 @@ jobs:
             VARIANT_PATH: remess/release/build.json
             # We have no code signing identity; without this electron-builder goes looking
             # for one in the keychain and fails the macOS build rather than building unsigned.
-            CSC_IDENTITY_AUTO_DISCOVERY: false
+            CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
         steps:
             - name: Check out Remess
@@ -125,7 +144,7 @@ jobs:
                   set -euo pipefail
                   pnpm exec tsc
                   node scripts/copy-res.ts
-                  pnpm exec electron-builder ${{ matrix.builder-args }} --publish=never
+                  pnpm exec electron-builder ${{ matrix.builderArgs }} --publish=never
 
             - name: Collect installers
               run: |
