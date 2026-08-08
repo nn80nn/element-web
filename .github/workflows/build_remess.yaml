@@ -121,6 +121,8 @@ jobs:
                   # $(pwd) rather than $RUNNER_TEMP: on the Windows runner the latter is a
                   # backslash path, which does not survive being put on PATH under bash.
                   corepack_bin="$(pwd)/.corepack"
+                  # corepack resolves the directory before writing to it, so it has to exist.
+                  mkdir -p "$corepack_bin"
                   corepack enable --install-directory "$corepack_bin" pnpm
                   export PATH="$corepack_bin:$PATH"
                   echo "pnpm for element-call: $(pnpm --version)"
