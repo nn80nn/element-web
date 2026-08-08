@@ -163,6 +163,24 @@ jobs:
               working-directory: apps/desktop
               run: pnpm exec asar p webapp webapp.asar
 
+            # Packaging is by far the longest step, and a good part of that is electron-builder
+            # fetching the same things every run: the Electron binaries, and the fpm and 7zip
+            # helpers it shells out to. Keyed on the desktop package.json, which is what pins
+            # the Electron version. The paths for the three runner families are all listed;
+            # cache ignores the ones that don't exist.
+            - name: Cache electron-builder downloads
+              uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+              with:
+                  path: |
+                      ~/.cache/electron
+                      ~/.cache/electron-builder
+                      ~/Library/Caches/electron
+                      ~/Library/Caches/electron-builder
+                      ~/AppData/Local/electron/Cache
+                      ~/AppData/Local/electron-builder/Cache
+                  key: electron-builder-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('apps/desktop/package.json') }}
+                  restore-keys: electron-builder-${{ runner.os }}-${{ runner.arch }}-
+
             # The pacman target shells out to bsdtar to build the package's .MTREE, and the
             # runner image doesn't ship it. Without this the Arch package fails at the very
             # last step with a bare "exit code 127", after everything else has built.
