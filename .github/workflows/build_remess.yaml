@@ -198,25 +198,74 @@ jobs:
                   node scripts/copy-res.ts
                   pnpm exec electron-builder ${{ matrix.builderArgs }} --publish=never
 
-            - name: Collect installers
-              run: |
-                  set -euo pipefail
-                  mkdir -p out
-                  # Only what someone would actually download. The unpacked application
-                  # directories contain a same-named .exe that is not an installer, and
-                  # Squirrel ships helper binaries next to the installer it produces;
-                  # including any of them just leaves the reader guessing which to run.
-                  find apps/desktop/dist -maxdepth 2 -type f \
-                      \( -name "*.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.zip" \
-                      -o -name "*.deb" -o -name "*.AppImage" -o -name "*.pacman" -o -name "*.tar.gz" \) \
-                      ! -path "*unpacked*" \
-                      ! -name "Squirrel.exe" \
-                      ! -name "*ExecutionStub*" \
-                      -exec cp {} out/ \;
-                  ls -lh out
+            - name: List what was produced
+              run: find apps/desktop/dist -maxdepth 2 -type f ! -path "*unpacked*" -exec ls -lh {} +
 
-            - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+            # One artifact per package format rather than one per platform, so that grabbing
+            # the Debian package doesn't mean downloading the Arch one and a tarball with it.
+            # Each glob is deliberately narrow: the unpacked application directory holds a
+            # same-named executable that is not an installer, and Squirrel puts helper
+            # binaries next to the installer it produces.
+            - name: Upload the Debian package
+              if: runner.os == 'Linux'
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
               with:
-                  name: remess-${{ matrix.platform }}
-                  path: out/
+                  name: remess-linux-deb
+                  path: apps/desktop/dist/*.deb
+                  if-no-files-found: error
+
+            - name: Upload the Arch package
+              if: runner.os == 'Linux'
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+              with:
+                  name: remess-linux-pacman
+                  path: apps/desktop/dist/*.pacman
+                  if-no-files-found: error
+
+            - name: Upload the AppImage
+              if: runner.os == 'Linux'
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+              with:
+                  name: remess-linux-appimage
+                  path: apps/desktop/dist/*.AppImage
+                  if-no-files-found: error
+
+            - name: Upload the Linux tarball
+              if: runner.os == 'Linux'
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+              with:
+                  name: remess-linux-tarball
+                  path: apps/desktop/dist/*.tar.gz
+                  if-no-files-found: error
+
+            - name: Upload the macOS disk image
+              if: runner.os == 'macOS'
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+              with:
+                  name: remess-macos-dmg
+                  path: apps/desktop/dist/*.dmg
+                  if-no-files-found: error
+
+            - name: Upload the macOS zip
+              if: runner.os == 'macOS'
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+              with:
+                  name: remess-macos-zip
+                  path: apps/desktop/dist/*-mac.zip
+                  if-no-files-found: error
+
+            - name: Upload the Windows installer
+              if: runner.os == 'Windows'
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+              with:
+                  name: remess-windows-setup
+                  path: apps/desktop/dist/squirrel-windows/*Setup*.exe
+                  if-no-files-found: error
+
+            - name: Upload the Windows MSI
+              if: runner.os == 'Windows'
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+              with:
+                  name: remess-windows-msi
+                  path: apps/desktop/dist/*.msi
                   if-no-files-found: error
