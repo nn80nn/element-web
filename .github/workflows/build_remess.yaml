@@ -111,12 +111,17 @@ jobs:
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
 
+            # Run with the version element-call pins rather than the one set up for this
+            # repo: its pnpm-workspace.yaml uses an allowBuilds key keyed by a git URL, which
+            # older pnpm rejects outright with ERR_PNPM_INVALID_VERSION_UNION. The nested
+            # install that prepares matrix-js-sdk still resolves its own pnpm, but the fork's
+            # pmOnFail setting keeps that mismatch from being fatal.
             - name: Build element-call (embedded)
               working-directory: element-call
               run: |
                   set -euo pipefail
-                  pnpm install --frozen-lockfile
-                  NODE_OPTIONS=--max-old-space-size=16384 pnpm exec vite build --config vite-embedded.config.ts
+                  npx --yes pnpm@11.6.0 install --frozen-lockfile
+                  NODE_OPTIONS=--max-old-space-size=16384 npx --yes pnpm@11.6.0 exec vite build --config vite-embedded.config.ts
 
             - name: Build the web app
               working-directory: apps/web
