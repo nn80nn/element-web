@@ -75,6 +75,13 @@ jobs:
                 shell: bash
         env:
             VARIANT_PATH: remess/release/build.json
+            # element-call depends on matrix-js-sdk from git, and preparing a git-hosted
+            # package runs a nested `pnpm install` inside the fetched tarball. That package
+            # pins an exact pnpm version, the nested call uses whichever pnpm is on PATH, and
+            # by default the mismatch is fatal. Nothing on PATH can satisfy every pinned
+            # version across three repositories, and the check doesn't affect what gets
+            # installed, so turn it into a warning.
+            npm_config_pm_on_fail: ignore
             # We have no code signing identity; without this electron-builder goes looking
             # for one in the keychain and fails the macOS build rather than building unsigned.
             CSC_IDENTITY_AUTO_DISCOVERY: "false"
@@ -99,14 +106,15 @@ jobs:
                   node-version-file: apps/desktop/.node-version
                   cache: pnpm
 
-            # element-call depends on matrix-js-sdk from git, and preparing a git-hosted
-            # package runs a nested `pnpm install` inside the fetched tarball. That package
-            # pins an exact pnpm version, the nested call picks up whichever pnpm is on PATH,
-            # and by default the mismatch is fatal. No single pnpm can satisfy every pinned
-            # version in the tree, and the check is advisory, so relax it. This has to go in
-            # the user config rather than on the command line to reach the nested call.
+            # Belt and braces, because a nested pnpm is awkward to reach: the env var is
+            # inherited by child processes by definition, and the config file is what pnpm
+            # itself reads. ~/.npmrc is deliberately not used -- pnpm keeps its global config
+            # under $XDG_CONFIG_HOME/pnpm/rc, so writing there has no effect on it.
+            # Non-fatal: `pnpm config set --global` refuses to run on setups where pnpm's
+            # global bin directory isn't on PATH, and the env var above is the load-bearing
+            # half of this anyway.
             - name: Relax pnpm's pinned-version check
-              run: echo "pm-on-fail=ignore" >> ~/.npmrc
+              run: pnpm config set --global pm-on-fail ignore || true
 
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
