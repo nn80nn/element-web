@@ -6,11 +6,11 @@
  */
 
 import { type CallMembership, MatrixRTCSessionManagerEvents } from "matrix-js-sdk/src/matrixrtc";
-import { type MatrixClient, type Room } from "matrix-js-sdk/src/matrix";
+import { type MatrixClient, Room } from "matrix-js-sdk/src/matrix";
 import { type MockedObject } from "jest-mock";
 
 import { ElementCall } from "../../../src/models/Call";
-import { CallStore } from "../../../src/stores/CallStore";
+import { CallStore, CallStoreEvent } from "../../../src/stores/CallStore";
 import SdkConfig from "../../../src/SdkConfig";
 import {
     setUpClientRoomAndStores,
@@ -48,6 +48,33 @@ describe("CallStore", () => {
         expect(getSpy).toHaveReturnedWith(expect.any(ElementCall));
         expect(CallStore.instance.getCall(room.roomId)).not.toBe(null);
         expect(CallStore.instance.getConfiguredRTCTransports()).toHaveLength(0);
+    });
+    it("keeps creating calls after a listener throws while a call is being announced", () => {
+        setupAsyncStoreWithClient(CallStore.instance, client);
+        const listener = jest.fn().mockImplementationOnce(() => {
+            throw new Error("a listener misbehaving");
+        });
+        CallStore.instance.on(CallStoreEvent.Call, listener);
+
+        // Rooms of our own, since the store is a singleton that may already know `room`
+        const first = new Room("!first:example.org", client, "@alice:example.org");
+        const second = new Room("!second:example.org", client, "@alice:example.org");
+        client.getRoom.mockImplementation((id) => (id === first.roomId ? first : id === second.roomId ? second : room));
+        // ElementCall.get decides from the client's own session for the room
+        client.matrixRTC.getRoomSession(room).memberships.push({} as CallMembership);
+        const start = (r: Room): void =>
+            void client.matrixRTC.emit(MatrixRTCSessionManagerEvents.SessionStarted, r.roomId, {
+                room: r,
+                memberships: [{}],
+            } as never);
+
+        expect(() => start(first)).toThrow("a listener misbehaving");
+
+        // The failure above must not have left the store believing an update is still in progress,
+        // so a call for a different room is still created.
+        start(second);
+        expect(CallStore.instance.getCall(second.roomId)).not.toBe(null);
+        CallStore.instance.off(CallStoreEvent.Call, listener);
     });
     it("calculates RTC transports with both modern and legacy endpoints", async () => {
         client._unstable_getRTCTransports.mockResolvedValue([

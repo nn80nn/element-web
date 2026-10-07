@@ -87,10 +87,7 @@ export class CallStore extends AsyncStoreWithClient<EmptyObject> {
                     logger.warn("Unexpected error when trying to fetch RTC transports, giving up", ex);
                     break;
                 }
-                logger.warn(
-                    `Unexpected error when trying to fetch RTC transports, retrying in ${retryDelayMs}ms`,
-                    ex,
-                );
+                logger.warn(`Unexpected error when trying to fetch RTC transports, retrying in ${retryDelayMs}ms`, ex);
                 await sleep(retryDelayMs);
             }
         }
@@ -188,37 +185,42 @@ export class CallStore extends AsyncStoreWithClient<EmptyObject> {
         // fighting for control over the same widget.
         if (!this.inUpdateRoom && !this.calls.has(room.roomId)) {
             this.inUpdateRoom = true;
-            const call = Call.get(room);
+            // Released in a finally: a listener that throws while we emit below must not leave the
+            // guard set, or no call could ever be created again until the app is restarted.
+            try {
+                const call = Call.get(room);
 
-            if (call) {
-                const onConnectionState = (state: ConnectionState): void => {
-                    if (state === ConnectionState.Connected) {
-                        this.connectedCalls = new Set([...this.connectedCalls, call]);
-                    } else if (state === ConnectionState.Disconnected) {
-                        this.connectedCalls = new Set([...this.connectedCalls].filter((c) => c !== call));
-                    }
-                };
-                const onDestroy = (): void => {
-                    this.calls.delete(room.roomId);
-                    for (const [event, listener] of this.callListeners.get(call)!) call.off(event, listener);
-                    this.updateRoom(room);
-                };
+                if (call) {
+                    const onConnectionState = (state: ConnectionState): void => {
+                        if (state === ConnectionState.Connected) {
+                            this.connectedCalls = new Set([...this.connectedCalls, call]);
+                        } else if (state === ConnectionState.Disconnected) {
+                            this.connectedCalls = new Set([...this.connectedCalls].filter((c) => c !== call));
+                        }
+                    };
+                    const onDestroy = (): void => {
+                        this.calls.delete(room.roomId);
+                        for (const [event, listener] of this.callListeners.get(call)!) call.off(event, listener);
+                        this.updateRoom(room);
+                    };
 
-                call.on(CallEvent.ConnectionState, onConnectionState);
-                call.on(CallEvent.Destroy, onDestroy);
+                    call.on(CallEvent.ConnectionState, onConnectionState);
+                    call.on(CallEvent.Destroy, onDestroy);
 
-                this.calls.set(room.roomId, call);
-                this.callListeners.set(
-                    call,
-                    new Map<CallEvent, (...args: any[]) => unknown>([
-                        [CallEvent.ConnectionState, onConnectionState],
-                        [CallEvent.Destroy, onDestroy],
-                    ]),
-                );
+                    this.calls.set(room.roomId, call);
+                    this.callListeners.set(
+                        call,
+                        new Map<CallEvent, (...args: any[]) => unknown>([
+                            [CallEvent.ConnectionState, onConnectionState],
+                            [CallEvent.Destroy, onDestroy],
+                        ]),
+                    );
+                }
+
+                this.emit(CallStoreEvent.Call, call, room.roomId);
+            } finally {
+                this.inUpdateRoom = false;
             }
-
-            this.emit(CallStoreEvent.Call, call, room.roomId);
-            this.inUpdateRoom = false;
         }
     }
 

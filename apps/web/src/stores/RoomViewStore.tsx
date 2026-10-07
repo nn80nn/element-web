@@ -376,19 +376,27 @@ export class RoomViewStore extends EventEmitter {
                 // Start a call if not already there
                 if (call === null) {
                     ElementCall.create(room);
-                    call = CallStore.instance.getCall(payload.room_id)!;
+                    call = CallStore.instance.getCall(payload.room_id);
                 }
 
-                // Custom case where we start voice calls in pip
-                if (payload.voiceOnly ?? false) {
+                if (call === null) {
+                    // Creating the call is supposed to make the store pick it up straight away. If it
+                    // didn't, carrying on would throw halfway through handling the room change and
+                    // leave the room unviewable, so show the room without a call instead.
+                    logger.warn(`No call available for ${payload.room_id} after creating one`);
                     viewingCall = false;
-                    ActiveWidgetStore.instance.setWidgetPersistence(call.widget.id, room.roomId, true);
-                }
-                call.presented = true;
-                // Immediately start the call. This will connect to all required widget events
-                // and allow the widget to show the lobby.
-                if (call.connectionState === ConnectionState.Disconnected) {
-                    call.start({ skipLobby: payload.skipLobby, voiceOnly: payload.voiceOnly });
+                } else {
+                    // Custom case where we start voice calls in pip
+                    if (payload.voiceOnly ?? false) {
+                        viewingCall = false;
+                        ActiveWidgetStore.instance.setWidgetPersistence(call.widget.id, room.roomId, true);
+                    }
+                    call.presented = true;
+                    // Immediately start the call. This will connect to all required widget events
+                    // and allow the widget to show the lobby.
+                    if (call.connectionState === ConnectionState.Disconnected) {
+                        call.start({ skipLobby: payload.skipLobby, voiceOnly: payload.voiceOnly });
+                    }
                 }
             }
             // If we switch to a different room from the call, we are no longer presenting it
