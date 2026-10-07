@@ -53,8 +53,11 @@ export class VoiceChannelSounds {
         this.matrixClient = undefined;
     }
 
-    private onCall = (call: Call): void => {
-        this.track(call);
+    // The store announces every room it looks at, with a null call for the ones that have none.
+    // Throwing from here is not an option: the store is still mid-update when it emits this, and
+    // an exception leaves it believing that update never finished, so it stops tracking calls.
+    private onCall = (call: Call | null): void => {
+        if (call) this.track(call);
     };
 
     private track(call: Call): void {

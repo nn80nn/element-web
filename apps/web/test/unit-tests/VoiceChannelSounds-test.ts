@@ -101,6 +101,10 @@ describe("VoiceChannelSounds", () => {
         expect(played).toHaveLength(0);
     });
 
+    it("copes with the store reporting a room that has no call", () => {
+        expect(() => store.emit(CallStoreEvent.Call, null, "!empty:example.org")).not.toThrow();
+    });
+
     it("starts watching calls that appear later", () => {
         const later = Object.assign(new EventEmitter(), {
             roomId: "!later:example.org",
