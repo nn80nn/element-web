@@ -280,6 +280,67 @@ describe("RoomListItemViewModel", () => {
         });
     });
 
+    describe("Call participants", () => {
+        const members = (...names: string[]): Map<RoomMember, Set<string>> =>
+            new Map(names.map((name) => [{ name, userId: `@${name}:x` } as RoomMember, new Set(["D"])]));
+
+        it("should show who is in the call instead of the last message", async () => {
+            jest.spyOn(SettingsStore, "getValue").mockReturnValue(true);
+            jest.spyOn(MessagePreviewStore.instance, "getPreviewForRoom").mockResolvedValue({
+                text: "Hello world!",
+            } as MessagePreview);
+            jest.spyOn(CallStore.instance, "getCall").mockReturnValue({
+                callType: CallType.Voice,
+                participants: members("Anna", "Bob"),
+                off: jest.fn(),
+                on: jest.fn(),
+            } as unknown as Call);
+
+            viewModel = new RoomListItemViewModel({ room, client: matrixClient });
+            await flushPromises();
+
+            expect(viewModel.getSnapshot().messagePreview).toBe("In call: Anna, Bob");
+        });
+
+        it("should summarise a crowded call", async () => {
+            jest.spyOn(CallStore.instance, "getCall").mockReturnValue({
+                callType: CallType.Voice,
+                participants: members("A", "B", "C", "D", "E"),
+                off: jest.fn(),
+                on: jest.fn(),
+            } as unknown as Call);
+
+            viewModel = new RoomListItemViewModel({ room, client: matrixClient });
+            await flushPromises();
+
+            expect(viewModel.getSnapshot().messagePreview).toBe("In call: A, B, C and 2 more");
+        });
+
+        it("should go back to the last message when the call empties", async () => {
+            jest.spyOn(SettingsStore, "getValue").mockReturnValue(true);
+            jest.spyOn(MessagePreviewStore.instance, "getPreviewForRoom").mockResolvedValue({
+                text: "Hello world!",
+            } as MessagePreview);
+            const mockCall = {
+                callType: CallType.Voice,
+                participants: members("Anna"),
+                off: jest.fn(),
+                on: jest.fn(),
+            };
+            jest.spyOn(CallStore.instance, "getCall").mockReturnValue(mockCall as unknown as Call);
+
+            viewModel = new RoomListItemViewModel({ room, client: matrixClient });
+            await flushPromises();
+            expect(viewModel.getSnapshot().messagePreview).toBe("In call: Anna");
+
+            mockCall.participants = members();
+            const onParticipants = mockCall.on.mock.calls.find(([event]) => event === CallEvent.Participants)![1];
+            onParticipants(mockCall.participants);
+
+            expect(viewModel.getSnapshot().messagePreview).toBe("Hello world!");
+        });
+    });
+
     describe("Call state", () => {
         it("should show voice call indicator", async () => {
             const mockCall = {

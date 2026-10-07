@@ -680,6 +680,7 @@ export default class Notifications extends React.PureComponent<EmptyObject, ISta
                             <SettingsFlag name="notificationsEnabled" level={SettingLevel.DEVICE} />
                             <SettingsFlag name="notificationBodyEnabled" level={SettingLevel.DEVICE} />
                             <SettingsFlag name="audioNotificationsEnabled" level={SettingLevel.DEVICE} />
+                            <SettingsFlag name="voiceChannelSounds" level={SettingLevel.DEVICE} />
                         </>
                     )}
 

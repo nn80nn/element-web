@@ -55,7 +55,7 @@ export class ElementAppPage {
      * Open room creation dialog.
      */
 
-    public async openCreateRoomDialog(roomKindname: "New room" | "New video room" = "New room"): Promise<Locator> {
+    public async openCreateRoomDialog(roomKindname: "New room" | "New voice channel" = "New room"): Promise<Locator> {
         await this.page
             .getByRole("navigation", { name: "Room list" })
             .getByRole("button", { name: "New conversation" })

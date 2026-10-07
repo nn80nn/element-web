@@ -190,12 +190,40 @@ export class RoomListItemViewModel
      * @param participants The current call participants
      */
     private onCallParticipantsChanged = (participants: Map<RoomMember, Set<string>>): void => {
+        // Who is in the call shows in place of the message preview, so it has to follow
+        // every join and leave, not just the call starting or ending.
+        this.showCallParticipants();
+
         const hasCall = Boolean(this.snapshot.current.notification.callType);
         // There is already an active call, we don't need to update the item
         if (hasCall && participants.size > 0) return;
 
         this.updateItem();
     };
+
+    /** The message preview as last loaded, kept so it can come back once the call is over. */
+    private messagePreview: string | undefined;
+
+    /**
+     * Who is in the room's call right now, as a line to show instead of the message preview,
+     * or undefined when nobody is. This is what lets a voice channel show its occupants in the
+     * room list the way they appear under a channel in Discord.
+     */
+    private callParticipantsLine(): string | undefined {
+        const participants = CallStore.instance.getCall(this.props.room.roomId)?.participants;
+        if (!participants?.size) return undefined;
+
+        const names = [...new Set([...participants.keys()].map((member) => member.name))];
+        const shown = names.slice(0, 3).join(", ");
+        const more = names.length - 3;
+        return more > 0
+            ? _t("room_list|call_participants_more", { names: shown, others: more })
+            : _t("room_list|call_participants", { names: shown });
+    }
+
+    private showCallParticipants(): void {
+        this.snapshot.merge({ messagePreview: this.callParticipantsLine() ?? this.messagePreview });
+    }
 
     /**
      * Handler for call type changes. Only updates the item if the call type is actually present in the snapshot.
@@ -225,6 +253,7 @@ export class RoomListItemViewModel
         const call = CallStore.instance.getCall(this.props.room.roomId);
 
         this.listenToCallParticipants();
+        this.showCallParticipants();
 
         const currentCallType = this.snapshot.current.notification.callType;
         const newCallType =
@@ -283,8 +312,8 @@ export class RoomListItemViewModel
      * Load and set the message preview if it differs from current.
      */
     private async loadAndSetMessagePreview(): Promise<void> {
-        const messagePreview = await this.loadMessagePreview();
-        this.snapshot.merge({ messagePreview });
+        this.messagePreview = await this.loadMessagePreview();
+        this.showCallParticipants();
     }
 
     /**

@@ -68,6 +68,7 @@ import { type URLParams } from "./vector/url_utils.ts";
 import { type OnLoggedInPayload } from "./dispatcher/payloads/OnLoggedInPayload.ts";
 import { filterBoolean } from "./utils/arrays.ts";
 import { CallStatusListener } from "./CallStatusListener.ts";
+import { VoiceChannelSounds } from "./VoiceChannelSounds.ts";
 import { CallStore } from "./stores/CallStore.ts";
 
 const HOMESERVER_URL_KEY = "mx_hs_url";
@@ -1076,6 +1077,7 @@ async function startMatrixClient(
     DeviceListener.sharedInstance().start(client);
 
     CallStatusListener.sharedInstance().start(CallStore.instance, client);
+    VoiceChannelSounds.sharedInstance().start(CallStore.instance, client);
 
     // Similarly, don't start sending presence updates until we've started
     // the client
@@ -1190,6 +1192,7 @@ export function stopMatrixClient(unsetClient = true): void {
     Mjolnir.sharedInstance().stop();
     DeviceListener.sharedInstance().stop();
     CallStatusListener.sharedInstance().stop();
+    VoiceChannelSounds.sharedInstance().stop();
     DMRoomMap.shared()?.stop();
     EventIndexPeg.stop();
     const cli = MatrixClientPeg.get();

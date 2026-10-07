@@ -110,11 +110,11 @@ test.describe("Room Header", () => {
         const createVideoRoom = async (page: Page, app: ElementAppPage) => {
             const roomListHeader = page.getByTestId("room-list-header");
             await roomListHeader.getByRole("button", { name: "New conversation" }).click();
-            await page.getByRole("menuitem", { name: "New video room" }).click();
+            await page.getByRole("menuitem", { name: "New voice channel" }).click();
 
             await page.getByRole("textbox", { name: "Name" }).type("Test video room");
 
-            await page.getByRole("button", { name: "Create video room" }).click();
+            await page.getByRole("button", { name: "Create voice channel" }).click();
 
             await app.viewRoomByName("Test video room");
         };

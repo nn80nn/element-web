@@ -66,7 +66,7 @@ describe("<RoomAvatarView />", () => {
         });
         const { asFragment } = render(<RoomAvatarView room={room} />);
 
-        expect(screen.getByLabelText("This room is a video room")).toBeInTheDocument();
+        expect(screen.getByLabelText("This room is a voice channel")).toBeInTheDocument();
         expect(asFragment()).toMatchSnapshot();
     });
 

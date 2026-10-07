@@ -138,7 +138,7 @@ exports[`<RoomAvatarView /> should render a video room decoration 1`] = `
       />
     </span>
     <svg
-      aria-label="This room is a video room"
+      aria-label="This room is a voice channel"
       aria-labelledby="react-use-id-1"
       class="mx_RoomAvatarView_icon"
       color="var(--cpd-color-icon-tertiary)"

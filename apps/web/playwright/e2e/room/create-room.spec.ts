@@ -75,7 +75,7 @@ test.describe("Create Room", () => {
         await app.settings.setValue("feature_video_rooms", null, SettingLevel.DEVICE, true);
         await rejectToast(page, "Verify this device");
 
-        const dialog = await app.openCreateRoomDialog("New video room");
+        const dialog = await app.openCreateRoomDialog("New voice channel");
         // Fill name & topic
         await dialog.getByRole("textbox", { name: "Name" }).fill(name);
         await dialog.getByRole("textbox", { name: "Topic" }).fill(topic);
@@ -91,7 +91,7 @@ test.describe("Create Room", () => {
         });
 
         // Submit
-        await dialog.getByRole("button", { name: "Create video room" }).click();
+        await dialog.getByRole("button", { name: "Create voice channel" }).click();
 
         await expect(page).toHaveURL(new RegExp(`/#/room/#test-create-room-video:${user.homeServer}`));
         const header = page.locator(".mx_RoomHeader");

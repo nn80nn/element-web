@@ -468,9 +468,9 @@ test.describe("Element Call", () => {
                 .getByRole("navigation", { name: "Room list" })
                 .getByRole("button", { name: "New conversation" })
                 .click();
-            await page.getByRole("menuitem", { name: "New video room" }).click();
+            await page.getByRole("menuitem", { name: "New voice channel" }).click();
             await page.getByRole("textbox", { name: "Name" }).fill("Test room");
-            await page.getByRole("button", { name: "Create video room" }).click();
+            await page.getByRole("button", { name: "Create voice channel" }).click();
             await expect(page).toHaveURL(new RegExp(`/#/room/`));
             const roomId = new URL(page.url()).hash.slice("#/room/".length);
 

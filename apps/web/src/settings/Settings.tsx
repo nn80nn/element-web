@@ -311,6 +311,7 @@ export interface Settings {
     "notificationSound": IBaseSetting<NotificationSound | false>;
     "notificationBodyEnabled": IBaseSetting<boolean>;
     "audioNotificationsEnabled": IBaseSetting<boolean>;
+    "voiceChannelSounds": IBaseSetting<boolean>;
     "enableWidgetScreenshots": IBaseSetting<boolean>;
     "promptBeforeInviteUnknownUsers": IBaseSetting<boolean>;
     "widgetOpenIDPermissions": IBaseSetting<{
@@ -1153,6 +1154,11 @@ export const SETTINGS: Settings = {
         supportedLevels: LEVELS_DEVICE_ONLY_SETTINGS,
         default: true,
         displayName: _td("settings|notifications|enable_audible_notifications_session"),
+    },
+    "voiceChannelSounds": {
+        supportedLevels: LEVELS_DEVICE_ONLY_SETTINGS,
+        default: true,
+        displayName: _td("settings|notifications|voice_channel_sounds"),
     },
     "enableWidgetScreenshots": {
         supportedLevels: LEVELS_ACCOUNT_SETTINGS,

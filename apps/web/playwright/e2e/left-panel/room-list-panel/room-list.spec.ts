@@ -356,13 +356,13 @@ test.describe("Room list", () => {
                 .getByRole("navigation", { name: "Room list" })
                 .getByRole("button", { name: "New conversation" })
                 .click();
-            await page.getByRole("menuitem", { name: "New video room" }).click();
+            await page.getByRole("menuitem", { name: "New voice channel" }).click();
             await page.getByRole("textbox", { name: "Name" }).fill("video room");
             // Make it public to avoid any crypto setup toasts
             await page.getByRole("button", { name: "Room visibility" }).click();
             await page.getByRole("option", { name: "Public room" }).click();
             await page.getByRole("textbox", { name: "Room address" }).fill("video-room");
-            await page.getByRole("button", { name: "Create video room" }).click();
+            await page.getByRole("button", { name: "Create voice channel" }).click();
 
             const roomListView = getRoomList(page);
             const videoRoom = roomListView.getByRole("option", { name: "video room" });

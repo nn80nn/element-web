@@ -30,6 +30,7 @@ import { type RoomScrollStateStore } from "../stores/RoomScrollStateStore";
 import { type ConsoleLogger, type IndexedDBLogStore } from "../rageshake/rageshake";
 import type ActiveWidgetStore from "../stores/ActiveWidgetStore";
 import type { CallStatusListener } from "../CallStatusListener";
+import type { VoiceChannelSounds } from "../VoiceChannelSounds";
 import { type IConfigOptions } from "../IConfigOptions";
 import { type MatrixDispatcher } from "../dispatcher/dispatcher";
 import { type DeepReadonly } from "./common";
@@ -86,6 +87,7 @@ declare global {
         mxToastStore: ToastStore;
         mxDeviceListener: DeviceListener;
         mxCallStatusListener: CallStatusListener;
+        mxVoiceChannelSounds: VoiceChannelSounds;
         getRoomListStoreV3: () => RoomListStoreV3Class;
         mxPlatformPeg: PlatformPeg;
         mxIntegrationManagers: typeof IntegrationManagers;

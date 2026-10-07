@@ -132,6 +132,7 @@ export default function NotificationSettings2(): JSX.Element {
                         level={SettingLevel.DEVICE}
                     />
                     <SettingsFlag name="audioNotificationsEnabled" level={SettingLevel.DEVICE} />
+                    <SettingsFlag name="voiceChannelSounds" level={SettingLevel.DEVICE} />
                 </Form.Root>
                 <SettingsSubsection
                     heading={
